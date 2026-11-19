@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 // Íconos de la interfaz (navegación y pestañas). Trazo de 2px, mismo lenguaje que los de productos.
 const UI = {
@@ -20,6 +20,10 @@ const UI = {
   membresia: 'M3 5h18v14H3zM3 10h18M7 15h4',
   salir: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l-5-5 5-5M5 12h12',
   izquierda: 'M15 18l-6-6 6-6',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  operar: 'M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
+  abajo: 'M6 9l6 6 6-6',
+  cerrar: 'M6 6l12 12M18 6 6 18',
   derecha: 'M9 18l6-6-6-6',
 } as const
 
@@ -39,7 +43,17 @@ export interface Pestana<T extends string> {
   icono: IconoUI
   /** número pequeño junto al texto (p. ej. pendientes) */
   aviso?: number
+  /** en celular va en la barra inferior; las demás quedan en el menú lateral */
+  principal?: boolean
 }
+
+/** Las pestañas de la pantalla actual, para que la barra inferior del celular y el menú lateral las usen. */
+export interface RegistroPestanas {
+  items: Pestana<string>[]
+  valor: string
+  onCambio: (t: string) => void
+}
+export const NavPanelCtx = createContext<{ registrar: (r: RegistroPestanas | null) => void } | null>(null)
 
 /**
  * Barra de pestañas de los paneles. Nunca se sale de la pantalla: si no caben, se desplaza
@@ -49,6 +63,19 @@ export interface Pestana<T extends string> {
 export function Pestanas<T extends string>({ items, valor, onCambio, etiqueta }: { items: Pestana<T>[]; valor: T; onCambio: (t: T) => void; etiqueta: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const [bordes, setBordes] = useState({ izq: false, der: false })
+
+  // Registra estas pestañas en el layout (barra inferior y menú lateral en celular).
+  const ctx = useContext(NavPanelCtx)
+  const ultimo = useRef({ items, valor, onCambio })
+  useEffect(() => {
+    ultimo.current = { items, valor, onCambio }
+  })
+  const firma = items.map((i) => `${i.id}:${i.texto}:${i.aviso ?? ''}:${i.principal ? 1 : 0}`).join('|') + '#' + valor
+  useEffect(() => {
+    ctx?.registrar({ items: items as Pestana<string>[], valor, onCambio: (t) => ultimo.current.onCambio(t as T) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx, firma])
+  useEffect(() => () => ctx?.registrar(null), [ctx])
 
   useEffect(() => {
     const el = ref.current

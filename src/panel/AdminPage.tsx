@@ -93,11 +93,11 @@ function Admin({ yo }: { yo: Yo }) {
         valor={tab}
         onCambio={setTab}
         items={[
-          { id: 'dashboard', texto: 'Dashboard', icono: 'dashboard' },
+          { id: 'dashboard', texto: 'Dashboard', icono: 'dashboard', principal: true },
           { id: 'sede', texto: 'Sede y calendario', icono: 'sede' },
-          { id: 'planes', texto: 'Planes', icono: 'planes' },
-          { id: 'productos', texto: 'Productos', icono: 'productos' },
-          { id: 'promociones', texto: 'Promociones', icono: 'promociones' },
+          { id: 'planes', texto: 'Planes', icono: 'planes', principal: true },
+          { id: 'productos', texto: 'Productos', icono: 'productos', principal: true },
+          { id: 'promociones', texto: 'Promociones', icono: 'promociones', principal: true },
           { id: 'recepcion', texto: 'Recepción', icono: 'recepcion' },
           { id: 'coaches', texto: 'Coaches', icono: 'coaches' },
           { id: 'bitacora', texto: 'Bitácora', icono: 'bitacora' },

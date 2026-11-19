@@ -104,10 +104,10 @@ function Recepcion({ yo }: { yo: Yo }) {
             valor={tab}
             onCambio={setTab}
             items={[
-              { id: 'socios', texto: 'Socios', icono: 'socios' },
-              { id: 'venta', texto: 'Venta', icono: 'venta' },
-              { id: 'solicitudes', texto: 'Solicitudes', icono: 'solicitudes', aviso: estado.solicitudesPendientes },
-              { id: 'alta', texto: 'Alta de socio', icono: 'alta' },
+              { id: 'socios', texto: 'Socios', icono: 'socios', principal: true },
+              { id: 'venta', texto: 'Venta', icono: 'venta', principal: true },
+              { id: 'solicitudes', texto: 'Solicitudes', icono: 'solicitudes', aviso: estado.solicitudesPendientes, principal: true },
+              { id: 'alta', texto: 'Alta de socio', icono: 'alta', principal: true },
               { id: 'inventario', texto: 'Inventario', icono: 'inventario' },
               { id: 'corte', texto: 'Corte de turno', icono: 'corte' },
             ]}

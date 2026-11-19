@@ -15,8 +15,7 @@
 /* ---------- Navegación del panel (independiente de la landing) ---------- */
 .panel-nav { gap: 16px; }
 .panel-nav__links { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-.panel-nav__link,
-.panel-abajo__link {
+.panel-nav__link {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -31,12 +30,60 @@
 }
 .panel-nav__link:hover { background: rgba(255, 255, 255, 0.12); }
 .panel-nav__link.active { background: var(--red); }
-.panel-nav__link:focus-visible,
-.panel-abajo__link:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
+.panel-nav__link:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
 .panel-nav__salir { display: inline-flex; align-items: center; gap: 8px; }
 
-/* Barra inferior (tableta y celular): íconos con texto, como una app */
-.panel-abajo { display: none; }
+/* Menú "Operar como" (escritorio) */
+.operar { position: relative; }
+.operar__btn { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 10px 14px 10px 16px; border-radius: 999px; font-weight: 700; font-size: 15px; white-space: nowrap; cursor: pointer; }
+.operar__btn:hover { background: rgba(255, 255, 255, 0.12); }
+.operar__btn.active { background: rgba(225, 6, 0, 0.55); }
+.operar__btn:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
+.operar__btn[aria-expanded='true'] svg:last-child { transform: rotate(180deg); }
+.operar__lista {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 1200;
+  min-width: 220px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  margin: 0;
+  list-style: none;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(24, 24, 27, 0.97), rgba(18, 18, 20, 0.95));
+}
+.operar__item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; font-weight: 700; text-decoration: none; color: var(--white); }
+.operar__item:hover, .operar__item:focus-visible { background: rgba(225, 6, 0, 0.4); outline: none; }
+.operar__item.active { background: var(--red); }
+
+/* Barra inferior tipo app y menú lateral: solo en celular */
+.app-barra { display: none; }
+.menu-lat__quien { display: grid; gap: 2px; min-width: 0; }
+.menu-lat__quien strong { font-weight: 900; font-size: 18px; }
+.menu-lat__quien small { color: var(--grey-l); font-size: 13px; overflow-wrap: anywhere; }
+.menu-lat__lista { display: grid; gap: 4px; list-style: none; margin: 0 0 6px; padding: 0; }
+.menu-lat__item {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 17px;
+  text-decoration: none;
+  color: var(--white);
+  cursor: pointer;
+}
+.menu-lat__item:hover, .menu-lat__item:focus-visible { background: rgba(255, 255, 255, 0.1); outline: none; }
+.menu-lat__item.active { background: var(--red); }
+.menu-lat__item .ptab__aviso { margin-left: auto; position: static; transform: none; }
+.menu-lat__salir { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: auto; width: 100%; }
+.menu-lat .drawer__panel { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
 
 /* Pestañas de acciones: nunca se salen de la pantalla */
 .ptabs {
@@ -441,37 +488,54 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
   .editor__ind { grid-column: 1 / -1; }
   .panel-nav__user { display: none; }
 }
-/* Tableta y celular: las secciones pasan a una barra inferior fija con íconos y texto. */
 @media (max-width: 1100px) {
-  .panel-nav__arriba { display: none; }
-  .panel-abajo {
+  .operar__lista { left: auto; right: 0; }
+}
+/* Celular y tableta vertical: barra inferior tipo app + menú lateral */
+@media (max-width: 900px) {
+  .panel-nav__arriba, .panel-nav__fin { display: none; }
+  .panel--con-barra { padding-bottom: 112px; }
+  /* Las pestañas de la pantalla viven en la barra inferior y en el menú lateral */
+  .panel .ptabs { display: none; }
+  .app-barra {
     display: block;
     position: fixed;
     z-index: 1100;
-    left: 50%;
+    left: 10px;
+    right: 10px;
     bottom: max(10px, env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    width: min(560px, calc(100% - 20px));
     padding: 6px;
-    border-radius: 22px;
-    background: linear-gradient(145deg, rgba(20, 20, 22, 0.88), rgba(20, 20, 22, 0.72));
+    border-radius: 24px;
+    background: linear-gradient(145deg, rgba(20, 20, 22, 0.92), rgba(20, 20, 22, 0.8));
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.8);
   }
-  .panel-abajo ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-  .panel-abajo li { flex: 1; min-width: 0; }
-  .panel-abajo__link {
+  .app-barra ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
+  .app-barra li { flex: 1; min-width: 0; }
+  .app-barra__item {
+    all: unset;
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
     flex-direction: column;
-    justify-content: center;
+    align-items: center;
     gap: 3px;
-    padding: 8px 4px;
-    border-radius: 16px;
+    padding: 8px 2px 7px;
+    border-radius: 18px;
     font-size: 12px;
+    font-weight: 700;
     line-height: 1.1;
+    color: var(--grey-l);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
   }
-  .panel-abajo__link span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-  .panel-abajo__link.active { background: var(--red); }
-  .panel--con-barra { padding-bottom: 110px; }
+  .app-barra__item.active { background: var(--red); color: var(--white); }
+  .app-barra__item:focus-visible { outline: 3px solid var(--white); outline-offset: -3px; }
+  .app-barra__icono { position: relative; display: grid; place-items: center; }
+  .app-barra__icono .ptab__aviso { position: absolute; top: -6px; right: -12px; transform: none; }
+  .app-barra__texto { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menu-lat .drawer__panel { width: min(340px, 86vw); }
 }
-
 @media (max-width: 760px) {
   .panel { padding-top: 96px; }
   .panel-nav__salir { padding-inline: 12px; }

@@ -91,8 +91,8 @@ function Coach({ yo }: { yo: Yo }) {
         valor={tab}
         onCambio={setTab}
         items={[
-          { id: 'socios', texto: 'Socios', icono: 'socios' },
-          { id: 'catalogo', texto: 'Máquinas y ejercicios', icono: 'coaches' },
+          { id: 'socios', texto: 'Socios', icono: 'socios', principal: true },
+          { id: 'catalogo', texto: 'Máquinas y ejercicios', icono: 'coaches', principal: true },
         ]}
       />
       {sedeId && tab === 'socios' && <SociosTab key={sedeId} sedeId={sedeId} catalogo={catalogo.ejercicios} irACatalogo={() => setTab('catalogo')} />}
