@@ -15,6 +15,7 @@ const P: Record<string, string> = {
   playera: 'M8 3l4 2 4-2 5 4-3 3-2-1v12H8V9l-2 1-3-3z',
   gorra: 'M3 15a9 7 0 0 1 18 0zM12 8V6M3 15h11',
   cinturon: 'M2 9h20v6H2zM14 8h4v8h-4zM16 12h-2',
+  visita: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 7v10',
   otro: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5',
 }
 
@@ -34,6 +35,7 @@ export const ICONOS: { clave: string; nombre: string }[] = [
   { clave: 'cinturon', nombre: 'Cinturón' },
   { clave: 'playera', nombre: 'Playera' },
   { clave: 'gorra', nombre: 'Gorra' },
+  { clave: 'visita', nombre: 'Visita' },
   { clave: 'otro', nombre: 'Otro' },
 ]
 

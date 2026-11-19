@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { InventarioTab, VentaTab } from './MostradorTienda'
-import { Pestanas } from './Navegacion'
+import { Pestanas, useEspejo } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import {
   aCentavos,
@@ -41,6 +41,7 @@ function Recepcion({ yo }: { yo: Yo }) {
   const [tab, setTab] = useState<Tab>('socios')
   const [seleccion, setSeleccion] = useState<{ perfilId: string; planId?: number; solicitudId?: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  useEspejo(null, error)
 
   useEffect(() => {
     if (permitidas === null) {
@@ -86,7 +87,6 @@ function Recepcion({ yo }: { yo: Yo }) {
           </label>
         )}
       </div>
-      {error && <p className="auth__error" role="alert">{error}</p>}
 
       {estado && !estado.turno && <AbrirTurno sedeId={sedeId} estado={estado} onAbierto={recargar} />}
 
@@ -136,6 +136,7 @@ function AbrirTurno({ sedeId, estado, onAbierto }: { sedeId: string; estado: Est
   const [fondo, setFondo] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useEspejo(null, error)
 
   if (!estado.recepcionistas.length) {
     return <div className="card glass">No hay recepcionistas en esta sede. El encargado debe darlos de alta en Administración → Recepción.</div>
@@ -175,7 +176,6 @@ function AbrirTurno({ sedeId, estado, onAbierto }: { sedeId: string; estado: Est
           <input id={`${id}-f`} inputMode="decimal" placeholder="$0" value={fondo} onChange={(e) => setFondo(e.target.value)} />
         </div>
       </div>
-      {error && <p className="auth__error" role="alert">{error}</p>}
       <button className="btn btn--red" disabled={busy}>{busy ? 'Abriendo…' : 'Abrir turno'}</button>
     </form>
   )
@@ -280,6 +280,7 @@ function FichaSocio({
   const [credencial, setCredencial] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useEspejo(null, error)
   const [banner, setBanner] = useState<{ texto: string; ok: boolean } | null>(null)
 
   const cargar = useCallback(() => {
@@ -321,7 +322,6 @@ function FichaSocio({
       </div>
 
       {banner && <p className={`banner ${banner.ok ? 'banner--ok' : 'banner--bad'}`} role="status">{banner.texto}</p>}
-      {error && <p className="auth__error" role="alert">{error}</p>}
 
       <button
         type="button"
@@ -463,6 +463,7 @@ function AltaTab({ sedeId, onAlta }: { sedeId: string; onAlta: (perfilId: string
   const [f, setF] = useState({ nombre: '', email: '', fechaNacimiento: '', alturaCm: '', pesoKg: '', objetivo: '' as Objetivo | '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useEspejo(null, error)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -520,7 +521,6 @@ function AltaTab({ sedeId, onAlta }: { sedeId: string; onAlta: (perfilId: string
           </select>
         </div>
       </div>
-      {error && <p className="auth__error" role="alert">{error}</p>}
       <button className="btn btn--red" disabled={busy}>{busy ? 'Registrando…' : 'Dar de alta y cobrar'}</button>
     </form>
   )
@@ -537,6 +537,7 @@ function CorteTab({ sedeId, estado, onCerrado }: { sedeId: string; estado: Estad
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useEspejo(null, error)
   const [hecho, setHecho] = useState<Turno | null>(null)
   const [historial, setHistorial] = useState<Turno[]>([])
 
@@ -591,7 +592,6 @@ function CorteTab({ sedeId, estado, onCerrado }: { sedeId: string; estado: Estad
               <label htmlFor={`${id}-p`}>PIN de {t.recepcionista}</label>
               <input id={`${id}-p`} type="password" inputMode="numeric" autoComplete="off" required value={pin} onChange={(e) => setPin(e.target.value)} />
             </div>
-            {error && <p className="auth__error" role="alert">{error}</p>}
             <button className="btn btn--red" disabled={busy}>{busy ? 'Cerrando…' : 'Cerrar turno'}</button>
           </>
         )}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, EQUIPOS, GRUPOS, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, objetivo } from './Entrenamiento'
-import { Pestanas } from './Navegacion'
+import { Pestanas, useEspejo } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { api, type Ejercicio, type Equipo, type FichaEntrenamiento, type GrupoMuscular, type Maquina, type Objetivo, type Rutina, type RutinaInput, type Sede, type SocioCoach } from './api'
 
@@ -24,12 +24,8 @@ function useAccion() {
       setBusy(false)
     }
   }
-  const avisos: ReactNode = (
-    <>
-      {error && <p className="auth__error" role="alert">{error}</p>}
-      {ok && <p className="auth__ok" role="status">{ok}</p>}
-    </>
-  )
+  useEspejo(ok, error)
+  const avisos: ReactNode = null
   return { busy, run, avisos }
 }
 

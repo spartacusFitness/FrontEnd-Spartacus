@@ -457,12 +457,17 @@ export default function Landing() {
                     <ul className="plan__lines">
                       {p.lines.map((l) => <li key={l}>{l}</li>)}
                     </ul>
-                    <AppLink
-                      className={`btn ${i === 2 ? 'btn--white' : 'btn--red'} plan__action`}
-                      to={`/login?next=pagar&sede=${sede.id}&plan=${p.name.toLowerCase()}`}
-                    >
-                      Pagar en línea
-                    </AppLink>
+                    {p.name === 'Visita' ? (
+                      // La visita no registra al socio: se vende en mostrador como cualquier producto.
+                      <p className="plan__action plan__recepcion">Se paga en recepción</p>
+                    ) : (
+                      <AppLink
+                        className={`btn ${i === 2 ? 'btn--white' : 'btn--red'} plan__action`}
+                        to={`/login?next=pagar&sede=${sede.id}&plan=${p.name.toLowerCase()}`}
+                      >
+                        Pagar en línea
+                      </AppLink>
+                    )}
                   </article>
                 ))}
               </div>

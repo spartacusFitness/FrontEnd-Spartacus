@@ -27,6 +27,7 @@ const UI = {
   operar: 'M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
   abajo: 'M6 9l6 6 6-6',
   cerrar: 'M6 6l12 12M18 6 6 18',
+  candado: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
   derecha: 'M9 18l6-6-6-6',
 } as const
 
@@ -159,6 +160,51 @@ export function Pestanas<T extends string>({ items, valor, onCambio, etiqueta }:
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+/* ---------- Avisos emergentes (confirmación / error) ---------- */
+
+type Aviso = { id: number; tipo: 'ok' | 'error'; texto: string }
+let oyente: ((a: Aviso) => void) | null = null
+let sig = 0
+
+/** Muestra un aviso emergente; lo pinta <Avisos/> (montado una vez en PanelLayout). */
+export const avisar = (tipo: Aviso['tipo'], texto: string) => oyente?.({ id: ++sig, tipo, texto })
+
+/** Refleja en avisos emergentes los estados ok/error que ya maneja una pantalla. */
+export function useEspejo(ok: string | null | undefined, error: string | null | undefined) {
+  useEffect(() => {
+    if (ok) avisar('ok', ok)
+  }, [ok])
+  useEffect(() => {
+    if (error) avisar('error', error)
+  }, [error])
+}
+
+export function Avisos() {
+  const [lista, setLista] = useState<Aviso[]>([])
+  useEffect(() => {
+    oyente = (a) => {
+      setLista((l) => [...l.slice(-2), a])
+      setTimeout(() => setLista((l) => l.filter((x) => x.id !== a.id)), a.tipo === 'error' ? 8000 : 5000)
+    }
+    return () => {
+      oyente = null
+    }
+  }, [])
+  return (
+    <div className="avisos" aria-live="polite">
+      {lista.map((a) => (
+        <div key={a.id} className={`aviso aviso--${a.tipo}`} role={a.tipo === 'error' ? 'alert' : 'status'}>
+          <span className="aviso__icono" aria-hidden="true">{a.tipo === 'ok' ? '✓' : '!'}</span>
+          <p>{a.texto}</p>
+          <button type="button" className="aviso__cerrar" aria-label="Cerrar aviso" onClick={() => setLista((l) => l.filter((x) => x.id !== a.id))}>
+            <IconoNav nombre="cerrar" size={16} />
+          </button>
+        </div>
+      ))}
     </div>
   )
 }

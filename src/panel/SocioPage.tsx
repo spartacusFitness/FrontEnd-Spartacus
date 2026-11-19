@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, actualizarPerfil, subirFoto, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, hoyDia, objetivo } from './Entrenamiento'
 import { Icono } from './Icono'
-import { Pestanas } from './Navegacion'
+import { IconoNav, Pestanas, avisar, type IconoUI } from './Navegacion'
 import { PanelLayout, tiene } from './PanelLayout'
 import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Nutricion, type Objetivo, type Plan, type Sexo } from './api'
 
@@ -30,20 +30,18 @@ type Tab = 'inicio' | 'rutina' | 'nutricion' | 'pagos' | 'tienda' | 'perfil'
 /** Acción con su propio aviso (ok / error) y estado de carga. */
 function useAccion() {
   const [busy, setBusy] = useState(false)
-  const [aviso, setAviso] = useState<{ ok?: string; error?: string } | null>(null)
   const run = async (fn: () => Promise<string | void>) => {
     setBusy(true)
-    setAviso(null)
     try {
       const m = await fn()
-      if (m) setAviso({ ok: m })
+      if (m) avisar('ok', m)
     } catch (e) {
-      setAviso({ error: msg(e) })
+      avisar('error', msg(e))
     } finally {
       setBusy(false)
     }
   }
-  const avisos: ReactNode = aviso?.error ? <p className="auth__error" role="alert">{aviso.error}</p> : aviso?.ok ? <p className="auth__ok" role="status">{aviso.ok}</p> : null
+  const avisos: ReactNode = null
   return { busy, run, avisos }
 }
 
@@ -66,11 +64,13 @@ function MiApp({ yo: yoInicial }: { yo: Yo }) {
     api.miEntrenamiento().then(setFicha).catch(() => {})
     api.miNutricion().then(setNutri).catch(() => {})
   }, [esSocio])
+  useEffect(cargarMembresia, [cargarMembresia])
+  const activa = !!m?.vigente
   useEffect(() => {
-    cargarMembresia()
+    if (!activa) return
     cargarEntreno()
     api.catalogo().then(setCatalogo).catch(() => {})
-  }, [cargarMembresia, cargarEntreno])
+  }, [activa, cargarEntreno])
 
   if (!yo.sede) {
     return (
@@ -84,9 +84,12 @@ function MiApp({ yo: yoInicial }: { yo: Yo }) {
 
   const nombreCorto = yo.apodo ?? yo.nombre?.split(' ')[0] ?? 'atleta'
   const promosHoy = catalogo?.promociones.length ?? 0
+  // Sin membresía vigente todo se ve, pero bloqueado (salvo Pagos y los datos de su cuenta).
+  const bloqueada = !!m && !m.vigente
+  const icono = (normal: IconoUI): IconoUI => (bloqueada ? 'candado' : normal)
 
   return (
-    <>
+    <div className="app-socio">
       <div className="panel-head">
         <div>
           <h1>Hola, {nombreCorto}</h1>
@@ -100,38 +103,58 @@ function MiApp({ yo: yoInicial }: { yo: Yo }) {
         onCambio={setTab}
         items={[
           { id: 'inicio', texto: 'Inicio', icono: 'inicio', principal: true },
-          { id: 'rutina', texto: 'Rutina', icono: 'coaches', principal: true },
-          { id: 'nutricion', texto: 'Nutrición', icono: 'nutricion', principal: true },
+          { id: 'rutina', texto: 'Rutina', icono: icono('coaches'), principal: true },
+          { id: 'nutricion', texto: 'Nutrición', icono: icono('nutricion'), principal: true },
           { id: 'pagos', texto: 'Pagos', icono: 'membresia', principal: true },
-          { id: 'tienda', texto: 'Tienda', icono: 'venta', aviso: promosHoy || undefined },
+          { id: 'tienda', texto: 'Tienda', icono: icono('venta'), aviso: promosHoy || undefined },
           { id: 'perfil', texto: 'Perfil', icono: 'perfil' },
         ]}
       />
 
-      {tab === 'inicio' && <Inicio m={m} ficha={ficha} nutri={nutri} promosHoy={promosHoy} ir={setTab} />}
-      {tab === 'rutina' && (
+      {tab === 'inicio' && <Inicio m={m} ficha={ficha} nutri={nutri} promosHoy={promosHoy} ir={setTab} bloqueada={bloqueada} />}
+      {bloqueada && tab === 'rutina' && <Bloqueado titulo="Mi rutina" incluye={['Tu rutina semanal hecha por tu coach', 'Ejercicios, series, repeticiones y descansos', 'Indicaciones de cada ejercicio']} ir={setTab} />}
+      {bloqueada && tab === 'nutricion' && <Bloqueado titulo="Mi nutrición" incluye={['Calorías y macros según tu objetivo', 'Ideas de comidas sin tus alérgenos', 'Consejos para tu objetivo']} ir={setTab} />}
+      {bloqueada && tab === 'tienda' && <Bloqueado titulo="Tienda" incluye={['Promociones del día', 'Productos disponibles en tu sede']} ir={setTab} />}
+      {!bloqueada && tab === 'rutina' && (
         <div className="card glass form">
           {ficha?.rutina ? <RutinaVista rutina={ficha.rutina} /> : <p>Tu coach todavía no te asigna rutina. Pídesela en tu siguiente visita.</p>}
         </div>
       )}
-      {tab === 'nutricion' && <NutricionVista nutri={nutri} ir={setTab} />}
+      {!bloqueada && tab === 'nutricion' && <NutricionVista nutri={nutri} ir={setTab} />}
       {tab === 'pagos' && <Pagos yo={yo} m={m} planes={planes} onCambio={cargarMembresia} />}
-      {tab === 'tienda' && <Tienda catalogo={catalogo} />}
+      {!bloqueada && tab === 'tienda' && <Tienda catalogo={catalogo} />}
       {tab === 'perfil' && (
         <Perfil
           yo={yo}
           ficha={ficha}
           onYo={setYo}
           onCambio={cargarEntreno}
+          bloqueada={bloqueada}
+          ir={setTab}
         />
       )}
-    </>
+    </div>
+  )
+}
+
+/** Función que existe pero requiere membresía: se ve en gris con lo que incluye. */
+function Bloqueado({ titulo, incluye, ir, compacto = false }: { titulo: string; incluye: string[]; ir: (t: Tab) => void; compacto?: boolean }) {
+  return (
+    <div className={`card glass bloqueado ${compacto ? 'bloqueado--compacto' : ''}`}>
+      <span className="bloqueado__candado"><IconoNav nombre="candado" size={20} /></span>
+      <h2 className="h3">{titulo}</h2>
+      <ul className="bloqueado__lista">
+        {incluye.map((i) => <li key={i}>{i}</li>)}
+      </ul>
+      <p className="field__hint">Disponible con tu membresía activa.</p>
+      {!compacto && <button type="button" className="btn btn--red" onClick={() => ir('pagos')}>Ver planes</button>}
+    </div>
   )
 }
 
 /* ---------------- Inicio ---------------- */
 
-function Inicio({ m, ficha, nutri, promosHoy, ir }: { m: MiMembresia | null; ficha: FichaEntrenamiento | null; nutri: Nutricion | null; promosHoy: number; ir: (t: Tab) => void }) {
+function Inicio({ m, ficha, nutri, promosHoy, ir, bloqueada }: { m: MiMembresia | null; ficha: FichaEntrenamiento | null; nutri: Nutricion | null; promosHoy: number; ir: (t: Tab) => void; bloqueada: boolean }) {
   const hoy = hoyDia()
   const rutina = ficha?.rutina
   const deHoy = rutina?.dias.find((d) => d.diaSemana === hoy)
@@ -148,6 +171,16 @@ function Inicio({ m, ficha, nutri, promosHoy, ir }: { m: MiMembresia | null; fic
           {m?.vigente ? 'Renovar' : 'Ver planes'}
         </button>
       </div>
+
+      {bloqueada && (
+        <div className="grid-2">
+          <Bloqueado compacto titulo="Mi racha" incluye={['Días seguidos y de la semana']} ir={ir} />
+          <Bloqueado compacto titulo="Hoy toca" incluye={['Tu rutina del día']} ir={ir} />
+          <Bloqueado compacto titulo="Mi nutrición" incluye={['Calorías y comidas']} ir={ir} />
+          <Bloqueado compacto titulo="Comunidad" incluye={['Logros y rachas']} ir={ir} />
+        </div>
+      )}
+      {!bloqueada && (<>
 
       <div className="grid-2">
         <div className="card glass">
@@ -209,6 +242,7 @@ function Inicio({ m, ficha, nutri, promosHoy, ir }: { m: MiMembresia | null; fic
           )}
         </div>
       </div>
+      </>)}
     </>
   )
 }
@@ -275,25 +309,8 @@ function NutricionVista({ nutri, ir }: { nutri: Nutricion | null; ir: (t: Tab) =
 /* ---------------- Pagos ---------------- */
 
 function Pagos({ yo, m, planes, onCambio }: { yo: Yo; m: MiMembresia | null; planes: Plan[]; onCambio: () => void }) {
-  const [busy, setBusy] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [ok, setOk] = useState<string | null>(null)
+  const [elegido, setElegido] = useState<Plan | null>(null)
   const pendiente = m?.solicitudes.find((s) => s.estado === 'pendiente_pago' || s.estado === 'pagada')
-
-  const pedir = async (plan: Plan) => {
-    setBusy(plan.id)
-    setError(null)
-    setOk(null)
-    try {
-      const s = await api.solicitar(plan.id, 'mostrador')
-      setOk(`Listo. Preséntate en recepción de ${yo.sede!.nombre} antes del ${horaMx(s.venceEn)} para pagar ${pesos(plan.precio)} y activar tu ${plan.nombre}.`)
-      onCambio()
-    } catch (e) {
-      setError(msg(e))
-    } finally {
-      setBusy(null)
-    }
-  }
 
   return (
     <>
@@ -319,8 +336,6 @@ function Pagos({ yo, m, planes, onCambio }: { yo: Yo; m: MiMembresia | null; pla
         </div>
       </div>
 
-      {error && <p className="auth__error" role="alert">{error}</p>}
-      {ok && <p className="auth__ok" role="status">{ok}</p>}
 
       <div className="card glass">
         <h2 className="h3">{m?.vigente ? 'Renovar o cambiar de plan' : 'Planes de tu sede'}</h2>
@@ -334,24 +349,92 @@ function Pagos({ yo, m, planes, onCambio }: { yo: Yo; m: MiMembresia | null; pla
                 {p.duracionDias} {p.duracionDias === 1 ? 'día' : 'días'}
                 {p.descripcion ? ` · ${p.descripcion}` : ''}
               </small>
-              {p.requiereValidacion || !p.pagoEnLinea ? (
-                <p className="field__hint">Se contrata en recepción{p.requiereValidacion ? ' presentando tu credencial o documento' : ''}.</p>
-              ) : (
-                <>
-                  <button type="button" className="btn btn--red btn--sm" disabled={busy !== null || !!pendiente} onClick={() => pedir(p)}>
-                    {busy === p.id ? 'Un momento…' : 'Pagar en el gym'}
-                  </button>
-                  <button type="button" className="btn btn--glass btn--sm glass" disabled title="Muy pronto">
-                    Pagar con tarjeta · pronto
-                  </button>
-                </>
-              )}
+              <button type="button" className="btn btn--red btn--sm" onClick={() => setElegido(p)}>
+                Ver detalle y pagar
+              </button>
             </div>
           ))}
         </div>
         {pendiente && <p className="field__hint" style={{ marginTop: 12 }}>Ya tienes una solicitud pendiente; complétala en recepción.</p>}
       </div>
+      {elegido && <PlanModal plan={elegido} yo={yo} m={m} pendiente={!!pendiente} onCerrar={() => setElegido(null)} onCambio={onCambio} />}
     </>
+  )
+}
+
+/** Desglose de un plan y las dos formas de pagarlo, cada una explicada. */
+function PlanModal({ plan, yo, m, pendiente, onCerrar, onCambio }: { plan: Plan; yo: Yo; m: MiMembresia | null; pendiente: boolean; onCerrar: () => void; onCambio: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    ref.current?.showModal()
+  }, [])
+  const soloRecepcion = plan.requiereValidacion || !plan.pagoEnLinea
+  const inicio = m?.vigente ? `al terminar tu membresía actual (${fechaLarga(m.vigente.fin)})` : 'el día que pagues'
+
+  const enGym = async () => {
+    setBusy(true)
+    try {
+      const s = await api.solicitar(plan.id, 'mostrador')
+      avisar('ok', `Listo. Preséntate en recepción de ${yo.sede!.nombre} antes del ${horaMx(s.venceEn)} para pagar ${pesos(plan.precio)} y activar tu ${plan.nombre}.`)
+      onCambio()
+      onCerrar()
+    } catch (e) {
+      avisar('error', msg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <dialog ref={ref} className="modal glass" aria-labelledby="plan-modal-titulo" onClose={onCerrar} onClick={(e) => e.target === e.currentTarget && onCerrar()}>
+      <div className="modal__cuerpo">
+        <div className="modal__head">
+          <h2 id="plan-modal-titulo" className="h3">{plan.nombre}</h2>
+          <button type="button" className="icon-btn glass" aria-label="Cerrar" onClick={onCerrar}><IconoNav nombre="cerrar" /></button>
+        </div>
+
+        <dl className="desglose">
+          <div><dt>Precio</dt><dd>{pesos(plan.precio)}</dd></div>
+          <div><dt>Duración</dt><dd>{plan.duracionDias} {plan.duracionDias === 1 ? 'día' : 'días'}</dd></div>
+          <div><dt>Sede</dt><dd>{yo.sede?.nombre}</dd></div>
+          <div><dt>Empieza</dt><dd>{inicio}</dd></div>
+        </dl>
+        {plan.descripcion && <p>{plan.descripcion}</p>}
+        <p className="field__hint">Si tu último día cae en un día que el gym cierra, se recorre al siguiente día abierto sin costo.</p>
+
+        <div className="pago-opciones">
+          <section className="pago-opcion">
+            <h3>Pagar en el gym</h3>
+            <ol>
+              <li>Reserva tu plan aquí; no se cobra nada todavía.</li>
+              <li>Tienes <strong>3 días hábiles</strong> para ir a recepción de {yo.sede?.nombre}.</li>
+              {plan.requiereValidacion && <li>Lleva tu credencial o documento: recepción lo revisa.</li>}
+              <li>Pagas en efectivo o con tarjeta en la terminal.</li>
+              <li>Tu membresía se activa en ese momento.</li>
+            </ol>
+            <button type="button" className="btn btn--red" disabled={busy || pendiente} onClick={enGym}>
+              {busy ? 'Reservando…' : 'Reservar y pagar en el gym'}
+            </button>
+            {pendiente && <p className="field__hint">Ya tienes una reserva pendiente; complétala en recepción.</p>}
+          </section>
+
+          <section className={`pago-opcion ${soloRecepcion ? 'pago-opcion--off' : ''}`}>
+            <h3>Pagar con tarjeta</h3>
+            {soloRecepcion ? (
+              <p>Este plan se contrata en recepción{plan.requiereValidacion ? ' porque necesitan revisar tu credencial' : ''}. Las renovaciones sí podrás pagarlas aquí.</p>
+            ) : (
+              <ol>
+                <li>Pagas aquí con tarjeta de forma segura (Stripe); tus datos no pasan por nosotros.</li>
+                <li>Tu membresía empieza en cuanto se confirma el pago.</li>
+                <li>Si es tu primera vez, pasa a recepción para registrar tu rostro y entrar.</li>
+              </ol>
+            )}
+            <button type="button" className="btn btn--glass glass" disabled>Disponible muy pronto</button>
+          </section>
+        </div>
+      </div>
+    </dialog>
   )
 }
 
@@ -396,7 +479,7 @@ function Tienda({ catalogo }: { catalogo: Catalogo | null }) {
 
 /* ---------------- Perfil ---------------- */
 
-function Perfil({ yo, ficha, onYo, onCambio }: { yo: Yo; ficha: FichaEntrenamiento | null; onYo: (y: Yo) => void; onCambio: () => void }) {
+function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: FichaEntrenamiento | null; onYo: (y: Yo) => void; onCambio: () => void; bloqueada: boolean; ir: (t: Tab) => void }) {
   const id = useId()
   const [datos, setDatos] = useState({ nombre: yo.nombre ?? '', apodo: yo.apodo ?? '', fechaNacimiento: yo.fechaNacimiento ?? '' })
   const [fisico, setFisico] = useState({ alturaCm: '', objetivo: '' as Objetivo | '', sexo: '' as Sexo | '' })
@@ -465,6 +548,9 @@ function Perfil({ yo, ficha, onYo, onCambio }: { yo: Yo; ficha: FichaEntrenamien
           </form>
         </div>
 
+        {bloqueada ? (
+          <Bloqueado titulo="Mi objetivo" incluye={['Tu objetivo, estatura y sexo para tu plan']} ir={ir} />
+        ) : (
         <form
           className="card glass form"
           onSubmit={(e) => {
@@ -502,8 +588,12 @@ function Perfil({ yo, ficha, onYo, onCambio }: { yo: Yo; ficha: FichaEntrenamien
           {accFisico.avisos}
           <button className="btn btn--glass glass" disabled={accFisico.busy}>Guardar</button>
         </form>
+        )}
       </div>
 
+      {bloqueada ? (
+        <Bloqueado titulo="Mi salud y mi avance" incluye={['Condiciones y alergias que ve tu coach', 'Tu historial de peso con gráfica']} ir={ir} />
+      ) : (
       <div className="grid-2">
         <form
           className="card glass form"
@@ -550,6 +640,7 @@ function Perfil({ yo, ficha, onYo, onCambio }: { yo: Yo; ficha: FichaEntrenamien
           {accPeso.avisos}
         </div>
       </div>
+      )}
     </>
   )
 }

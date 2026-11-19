@@ -140,6 +140,8 @@ export interface Producto {
   precio: number
   stock: number
   stockMinimo: number
+  /** servicio sin inventario (p. ej. Visita) */
+  esServicio: boolean
   activo: boolean
 }
 
@@ -313,7 +315,7 @@ export interface FichaEntrenamiento {
 export const api = {
   /* tienda (admin/encargado; recepción solo ve y registra entradas) */
   productos: (id: string, todos = false) => authed<Producto[]>('GET', `/sedes/${id}/productos${todos ? '?todos=1' : ''}`),
-  crearProducto: (id: string, data: { nombre: string; categoria: Categoria; icono: string; precio: number; stockInicial: number; stockMinimo: number }) =>
+  crearProducto: (id: string, data: { nombre: string; categoria: Categoria; icono: string; precio: number; stockInicial: number; stockMinimo: number; esServicio?: boolean }) =>
     authed<Producto>('POST', `/sedes/${id}/productos`, data),
   editarProducto: (id: string, pid: number, data: Partial<Pick<Producto, 'nombre' | 'categoria' | 'icono' | 'precio' | 'stockMinimo' | 'activo'>>) =>
     authed<Producto>('PATCH', `/sedes/${id}/productos/${pid}`, data),

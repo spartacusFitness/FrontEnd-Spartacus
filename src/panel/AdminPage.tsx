@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { DashboardTab } from './DashboardTab'
-import { Pestanas } from './Navegacion'
+import { Pestanas, useEspejo } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { ProductosTab, PromocionesTab } from './TiendaAdmin'
 import { aCentavos, api, fechaLarga, horaMx, pesos, type Coach, type DiaCerrado, type EntradaBitacora, type Plan, type Recepcionista, type Sede } from './api'
@@ -27,12 +27,8 @@ function useAccion() {
       setBusy(false)
     }
   }
-  const avisos: ReactNode = (
-    <>
-      {error && <p className="auth__error" role="alert">{error}</p>}
-      {ok && <p className="auth__ok" role="status">{ok}</p>}
-    </>
-  )
+  useEspejo(ok, error)
+  const avisos: ReactNode = null
   return { busy, run, avisos }
 }
 

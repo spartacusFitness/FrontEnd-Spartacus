@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import { ApiError } from '../auth/api'
 import { Icono } from './Icono'
 import { api, pesos, type ItemVenta, type Producto, type Promocion } from './api'
+import { useEspejo } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 
@@ -18,6 +19,7 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  useEspejo(ok, error)
 
   const cargar = useCallback(() => {
     api.productos(sedeId).then(setProductos).catch(() => {})
@@ -78,7 +80,7 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
         <div className="productos-grid">
           {visibles.length === 0 && <p className="field__hint">No hay productos. El encargado los agrega en Administración → Productos.</p>}
           {visibles.map((p) => {
-            const agotado = p.stock - enCarrito(p.id) <= 0
+            const agotado = !p.esServicio && p.stock - enCarrito(p.id) <= 0
             return (
               <button
                 key={p.id}
@@ -89,7 +91,7 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
               >
                 <span className="prod__icono"><Icono nombre={p.icono} /></span>
                 <strong>{p.nombre}</strong>
-                <small>{agotado ? 'Agotado' : `${p.stock - enCarrito(p.id)} disponibles`}</small>
+                <small>{p.esServicio ? 'Servicio' : agotado ? 'Agotado' : `${p.stock - enCarrito(p.id)} disponibles`}</small>
                 <span>{pesos(p.precio)}</span>
               </button>
             )
@@ -125,7 +127,6 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
             </label>
           ))}
         </div>
-        {error && <p className="auth__error" role="alert">{error}</p>}
         {ok && <p className="banner banner--ok" role="status">{ok}</p>}
         <div className="auth__done-actions">
           <button type="button" className="btn btn--red" disabled={busy || !carrito.length} onClick={cobrar}>
@@ -144,9 +145,10 @@ export function InventarioTab({ sedeId }: { sedeId: string }) {
   const [cant, setCant] = useState<Record<number, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  useEspejo(ok, error)
 
   const cargar = useCallback(() => {
-    api.productos(sedeId).then(setProductos).catch(() => {})
+    api.productos(sedeId).then((ps) => setProductos(ps.filter((p) => !p.esServicio))).catch(() => {})
   }, [sedeId])
   useEffect(cargar, [cargar])
 
@@ -167,8 +169,6 @@ export function InventarioTab({ sedeId }: { sedeId: string }) {
     <div className="card glass form">
       <h2 className="h3">Inventario</h2>
       <p className="field__hint">Registra aquí la mercancía que llega. Los ajustes por conteo y los precios los hace el encargado.</p>
-      {error && <p className="auth__error" role="alert">{error}</p>}
-      {ok && <p className="auth__ok" role="status">{ok}</p>}
       <div className="lista">
         {productos.map((p) => (
           <div key={p.id} className="fila">

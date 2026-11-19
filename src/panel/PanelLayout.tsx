@@ -4,7 +4,7 @@ import Background from '../Background'
 import { ApiError, salir, yo as cargarYo, type Rol, type Yo } from '../auth/api'
 import { supabase } from '../lib/supabase'
 import '../auth/auth.css'
-import { IconoNav, NavPanelCtx, type IconoUI, type Pestana, type RegistroPestanas } from './Navegacion'
+import { Avisos, IconoNav, NavPanelCtx, type IconoUI, type Pestana, type RegistroPestanas } from './Navegacion'
 import './panel.css'
 
 export const tiene = (yo: Yo, ...roles: Rol[]) => yo.roles.some((r) => roles.includes(r.rol))
@@ -268,6 +268,7 @@ export function PanelLayout({
   return (
     <NavPanelCtx.Provider value={ctx}>
       <Background />
+      <Avisos />
       <header className="nav glass panel-nav">
         <Link className="nav__mark" to="/">
           <img src="/images/logos/casco-oscuro.png" alt="" width={34} height={27} />

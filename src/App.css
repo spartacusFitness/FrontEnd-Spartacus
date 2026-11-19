@@ -1309,3 +1309,5 @@ main > section {
 .mantenimiento__aviso { padding: 16px 20px; border-radius: 18px; font-size: 16px; line-height: 1.45; }
 .mantenimiento__aviso strong { font-weight: 900; }
 .app__mant { font-weight: 800; font-size: 18px; }
+
+.plan__recepcion { display: grid; place-items: center; min-height: 48px; border-radius: 999px; border: 1px dashed rgba(255, 255, 255, 0.35); font-weight: 700; color: var(--grey-l); }

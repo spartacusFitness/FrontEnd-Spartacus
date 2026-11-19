@@ -3,6 +3,7 @@ import { ApiError } from '../auth/api'
 import { supabase } from '../lib/supabase'
 import { ICONOS, Icono } from './Icono'
 import { aCentavos, api, horaMx, pesos, type Categoria, type Movimiento, type Producto, type Promocion } from './api'
+import { useEspejo } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -16,17 +17,13 @@ const CATEGORIAS: [Categoria, string][] = [
 ]
 
 function Avisos({ error, ok }: { error: string | null; ok: string | null }) {
-  return (
-    <>
-      {error && <p className="auth__error" role="alert">{error}</p>}
-      {ok && <p className="auth__ok" role="status">{ok}</p>}
-    </>
-  )
+  useEspejo(ok, error)
+  return null
 }
 
 /* ---------------- Productos e inventario ---------------- */
 
-const VACIO = { nombre: '', categoria: 'suplementos' as Categoria, icono: 'proteina', precio: '', stockInicial: '0', stockMinimo: '0' }
+const VACIO = { nombre: '', categoria: 'suplementos' as Categoria, icono: 'proteina', precio: '', stockInicial: '0', stockMinimo: '0', esServicio: false }
 
 export function ProductosTab({ sedeId }: { sedeId: string }) {
   const id = useId()
@@ -68,7 +65,7 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
     run(async () => {
       const base = { nombre: f.nombre, categoria: f.categoria, icono: f.icono, precio: aCentavos(f.precio), stockMinimo: Number(f.stockMinimo) || 0 }
       if (editando) await api.editarProducto(sedeId, editando.id, base)
-      else await api.crearProducto(sedeId, { ...base, stockInicial: Number(f.stockInicial) || 0 })
+      else await api.crearProducto(sedeId, { ...base, stockInicial: f.esServicio ? 0 : Number(f.stockInicial) || 0, esServicio: f.esServicio })
       setF(VACIO)
       setEditando(null)
       return editando ? 'Producto actualizado.' : 'Producto agregado.'
@@ -107,7 +104,7 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
                   <small>{CATEGORIAS.find(([c]) => c === p.categoria)?.[1]}{p.activo ? '' : ' · desactivado'}</small>
                 </span>
               </span>
-              <span className={`tag ${p.stock === 0 ? 'tag--bad' : p.stock <= p.stockMinimo ? 'tag--warn' : 'tag--ok'}`}>{p.stock} en stock</span>
+              {p.esServicio ? <span className="tag">Servicio</span> : <span className={`tag ${p.stock === 0 ? 'tag--bad' : p.stock <= p.stockMinimo ? 'tag--warn' : 'tag--ok'}`}>{p.stock} en stock</span>}
             </button>
           ))}
         </div>
@@ -120,10 +117,10 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
               <span className="prod__icono"><Icono nombre={sel.icono} /></span>
               <div className="fila__main">
                 <strong style={{ fontSize: 20 }}>{sel.nombre}</strong>
-                <small>{sel.stock} en stock · mínimo {sel.stockMinimo}</small>
+                <small>{sel.esServicio ? 'Servicio: sin inventario' : `${sel.stock} en stock · mínimo ${sel.stockMinimo}`}</small>
               </div>
             </div>
-            <form className="form" onSubmit={registrar}>
+            {!sel.esServicio && <form className="form" onSubmit={registrar}>
               <div className="dias" role="radiogroup" aria-label="Tipo de movimiento">
                 <label className="dia"><input type="radio" checked={mov.tipo === 'entrada'} onChange={() => setMov({ ...mov, tipo: 'entrada' })} />Llegó mercancía</label>
                 <label className="dia"><input type="radio" checked={mov.tipo === 'ajuste'} onChange={() => setMov({ ...mov, tipo: 'ajuste' })} />Ajuste por conteo</label>
@@ -140,12 +137,12 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
               </div>
               <div className="auth__done-actions">
                 <button className="btn btn--red btn--sm" disabled={busy}>Registrar</button>
-                <button type="button" className="btn btn--glass btn--sm glass" onClick={() => { setEditando(sel); setF({ nombre: sel.nombre, categoria: sel.categoria, icono: sel.icono, precio: String(sel.precio / 100), stockInicial: '0', stockMinimo: String(sel.stockMinimo) }) }}>Editar datos</button>
+                <button type="button" className="btn btn--glass btn--sm glass" onClick={() => { setEditando(sel); setF({ nombre: sel.nombre, categoria: sel.categoria, icono: sel.icono, precio: String(sel.precio / 100), stockInicial: '0', stockMinimo: String(sel.stockMinimo), esServicio: sel.esServicio }) }}>Editar datos</button>
                 <button type="button" className="btn btn--glass btn--sm glass" onClick={() => run(async () => { await api.editarProducto(sedeId, sel.id, { activo: !sel.activo }); setSel({ ...sel, activo: !sel.activo }) })}>
                   {sel.activo ? 'Desactivar' : 'Activar'}
                 </button>
               </div>
-            </form>
+            </form>}
             {movs.length > 0 && (
               <table className="tabla">
                 <thead><tr><th>Fecha</th><th>Movimiento</th><th className="num">Cant.</th><th className="num">Quedó</th></tr></thead>
@@ -181,18 +178,24 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
               <label htmlFor={`${id}-p`}>Precio (MXN)</label>
               <input id={`${id}-p`} inputMode="decimal" required value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })} />
             </div>
-            {!editando && (
+            {!editando && !f.esServicio && (
               <div className="field">
                 <label htmlFor={`${id}-s`}>Stock inicial</label>
                 <input id={`${id}-s`} type="number" min={0} value={f.stockInicial} onChange={(e) => setF({ ...f, stockInicial: e.target.value })} />
               </div>
             )}
-            <div className="field">
+            {!f.esServicio && <div className="field">
               <label htmlFor={`${id}-mi`}>Avisar con</label>
               <input id={`${id}-mi`} type="number" min={0} value={f.stockMinimo} onChange={(e) => setF({ ...f, stockMinimo: e.target.value })} aria-describedby={`${id}-mi-h`} />
               <small id={`${id}-mi-h`} className="field__hint">piezas o menos</small>
-            </div>
+            </div>}
           </div>
+          {!editando && (
+            <label className="check">
+              <input type="checkbox" checked={f.esServicio} onChange={(e) => setF({ ...f, esServicio: e.target.checked })} />
+              Es un servicio sin inventario (p. ej. Visita de un día)
+            </label>
+          )}
           <fieldset className="field" style={{ border: 0, padding: 0 }}>
             <legend className="field__label">Ícono</legend>
             <div className="iconos-sel">
