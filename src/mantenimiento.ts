@@ -3,4 +3,4 @@
  * sin login, registro, pagos ni paneles. En `dev` y `produccion` vale `false`.
  * Es lo ÚNICO que cambia entre `produccion` y `mantenimiento`.
  */
-export const EN_MANTENIMIENTO: boolean = false
+export const EN_MANTENIMIENTO: boolean = true
