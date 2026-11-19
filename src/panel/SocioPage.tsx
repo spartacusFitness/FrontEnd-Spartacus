@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, type Yo } from '../auth/api'
 import { PanelLayout, tiene } from './PanelLayout'
 import { Icono } from './Icono'
-import { api, fechaLarga, horaMx, pesos, type Catalogo, type MiMembresia, type Plan } from './api'
+import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Objetivo, type Plan } from './api'
+import { AvancePeso, OBJETIVOS, RachaVista, RutinaVista } from './Entrenamiento'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 
@@ -162,6 +163,136 @@ function MiPanel({ yo }: { yo: Yo }) {
           </div>
         </div>
       )}
+
+      {tiene(yo, 'socio') && <MiEntrenamiento />}
     </>
   )
 }
+
+/* ---------------- Mi entrenamiento (fase 3) ---------------- */
+
+function MiEntrenamiento() {
+  const id = useId()
+  const [f, setF] = useState<FichaEntrenamiento | null>(null)
+  const [salud, setSalud] = useState({ condiciones: '', alergias: '' })
+  const [fisico, setFisico] = useState({ alturaCm: '', objetivo: '' as Objetivo | '' })
+  const [busy, setBusy] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<{ donde: string; ok?: string; error?: string } | null>(null)
+
+  const cargar = useCallback(
+    () =>
+      api
+        .miEntrenamiento()
+        .then((x) => {
+          setF(x)
+          setSalud({ condiciones: x.salud?.condiciones ?? '', alergias: x.salud?.alergias ?? '' })
+          setFisico({ alturaCm: x.alturaCm ? String(x.alturaCm) : '', objetivo: x.objetivo ?? '' })
+        })
+        .catch(() => {}),
+    [],
+  )
+  useEffect(() => {
+    cargar()
+  }, [cargar])
+
+  const run = async (donde: string, fn: () => Promise<string>) => {
+    setBusy(donde)
+    setAviso(null)
+    try {
+      setAviso({ donde, ok: await fn() })
+    } catch (e) {
+      setAviso({ donde, error: msg(e) })
+    } finally {
+      setBusy(null)
+    }
+  }
+  const avisos = (donde: string) =>
+    aviso?.donde === donde && (aviso.error ? <p className="auth__error" role="alert">{aviso.error}</p> : <p className="auth__ok" role="status">{aviso.ok}</p>)
+
+  if (!f) return null
+  return (
+    <>
+      <h2 className="h2 seccion-titulo">Mi entrenamiento</h2>
+      <div className="grid-2">
+        <div className="card glass">
+          <h3 className="h3">Mi racha</h3>
+          <RachaVista racha={f.racha} />
+        </div>
+        <div className="card glass form">
+          <h3 className="h3">Mi rutina</h3>
+          {f.rutina ? <RutinaVista rutina={f.rutina} /> : <p>Tu coach todavía no te asigna rutina. Pídesela en tu siguiente visita.</p>}
+        </div>
+      </div>
+
+      <div className="grid-2">
+        <form
+          className="card glass form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            run('fisico', async () => {
+              await api.miFisico({ alturaCm: fisico.alturaCm ? Number(fisico.alturaCm) : null, objetivo: fisico.objetivo || null })
+              await cargar()
+              return 'Guardado. Tu coach ya lo ve.'
+            })
+          }}
+        >
+          <h3 className="h3">Mi objetivo</h3>
+          <div className="field">
+            <label htmlFor={`${id}-o`}>Objetivo</label>
+            <select id={`${id}-o`} className="select" value={fisico.objetivo} onChange={(e) => setFisico({ ...fisico, objetivo: e.target.value as Objetivo | '' })}>
+              <option value="">Elige tu objetivo</option>
+              {OBJETIVOS.map(([k, l, d]) => <option key={k} value={k}>{l} — {d}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor={`${id}-a`}>Estatura (cm)</label>
+            <input id={`${id}-a`} inputMode="numeric" pattern="d{2,3}" placeholder="Ej. 170" value={fisico.alturaCm} onChange={(e) => setFisico({ ...fisico, alturaCm: e.target.value })} />
+          </div>
+          {avisos('fisico')}
+          <button className="btn btn--glass glass" disabled={busy === 'fisico'}>Guardar</button>
+        </form>
+
+        <form
+          className="card glass form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            run('salud', async () => {
+              await api.miSalud({ condiciones: salud.condiciones || null, alergias: salud.alergias || null })
+              return 'Guardado.'
+            })
+          }}
+        >
+          <h3 className="h3">Mi salud</h3>
+          <p className="field__hint">Solo tú y los coaches de tu sede lo ven. Les ayuda a cuidarte y a recomendarte qué comer.</p>
+          <div className="field">
+            <label htmlFor={`${id}-c`}>Condiciones especiales</label>
+            <textarea id={`${id}-c`} rows={3} placeholder="Lesiones, enfermedades, embarazo…" value={salud.condiciones} onChange={(e) => setSalud({ ...salud, condiciones: e.target.value })} />
+          </div>
+          <div className="field">
+            <label htmlFor={`${id}-al`}>Alergias</label>
+            <input id={`${id}-al`} placeholder="Ej. nuez, lactosa" value={salud.alergias} onChange={(e) => setSalud({ ...salud, alergias: e.target.value })} />
+          </div>
+          {avisos('salud')}
+          <button className="btn btn--glass glass" disabled={busy === 'salud'}>Guardar</button>
+        </form>
+      </div>
+
+      <div className="card glass form">
+        <h3 className="h3">Mi avance</h3>
+        <AvancePeso
+          ficha={f}
+          busy={busy === 'peso'}
+          onRegistrar={(kg) =>
+            run('peso', async () => {
+              await api.miPeso(kg)
+              await cargar()
+              return 'Peso registrado.'
+            })
+          }
+        />
+        {avisos('peso')}
+      </div>
+    </>
+  )
+}
+

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { DashboardTab } from './DashboardTab'
+import { Pestanas } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { ProductosTab, PromocionesTab } from './TiendaAdmin'
-import { aCentavos, api, fechaLarga, horaMx, pesos, type DiaCerrado, type EntradaBitacora, type Plan, type Recepcionista, type Sede } from './api'
+import { aCentavos, api, fechaLarga, horaMx, pesos, type Coach, type DiaCerrado, type EntradaBitacora, type Plan, type Recepcionista, type Sede } from './api'
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
@@ -43,7 +44,7 @@ export default function AdminPage() {
   )
 }
 
-type Tab = 'dashboard' | 'sede' | 'planes' | 'productos' | 'promociones' | 'recepcion' | 'bitacora'
+type Tab = 'dashboard' | 'sede' | 'planes' | 'productos' | 'promociones' | 'recepcion' | 'coaches' | 'bitacora'
 
 function Admin({ yo }: { yo: Yo }) {
   const [sedes, setSedes] = useState<Sede[]>([])
@@ -87,23 +88,21 @@ function Admin({ yo }: { yo: Yo }) {
       </div>
       {error && <p className="auth__error" role="alert">{error}</p>}
 
-      <div className="tabs glass" role="tablist" aria-label="Secciones">
-        {(
-          [
-            ['dashboard', 'Dashboard'],
-            ['sede', 'Sede y calendario'],
-            ['planes', 'Planes'],
-            ['productos', 'Productos'],
-            ['promociones', 'Promociones'],
-            ['recepcion', 'Recepción'],
-            ['bitacora', 'Bitácora'],
-          ] as [Tab, string][]
-        ).map(([t, label]) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={`tab ${tab === t ? 'is-active' : ''}`} onClick={() => setTab(t)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <Pestanas<Tab>
+        etiqueta="Secciones de administración"
+        valor={tab}
+        onCambio={setTab}
+        items={[
+          { id: 'dashboard', texto: 'Dashboard', icono: 'dashboard' },
+          { id: 'sede', texto: 'Sede y calendario', icono: 'sede' },
+          { id: 'planes', texto: 'Planes', icono: 'planes' },
+          { id: 'productos', texto: 'Productos', icono: 'productos' },
+          { id: 'promociones', texto: 'Promociones', icono: 'promociones' },
+          { id: 'recepcion', texto: 'Recepción', icono: 'recepcion' },
+          { id: 'coaches', texto: 'Coaches', icono: 'coaches' },
+          { id: 'bitacora', texto: 'Bitácora', icono: 'bitacora' },
+        ]}
+      />
 
       {tab === 'dashboard' && sedes.length > 0 && <DashboardTab sedes={sedes} todas={permitidas === null} />}
       {sede && tab === 'productos' && <ProductosTab key={sede.id} sedeId={sede.id} />}
@@ -111,6 +110,7 @@ function Admin({ yo }: { yo: Yo }) {
       {sede && tab === 'sede' && <SedeTab key={sede.id} sede={sede} onGuardada={recargar} esAdmin={permitidas === null} />}
       {sede && tab === 'planes' && <PlanesTab key={sede.id} sedeId={sede.id} />}
       {sede && tab === 'recepcion' && <RecepcionTab key={sede.id} sedeId={sede.id} />}
+      {sede && tab === 'coaches' && <CoachesTab key={sede.id} sedeId={sede.id} />}
       {sede && tab === 'bitacora' && <BitacoraTab key={sede.id} sedeId={sede.id} />}
     </>
   )
@@ -506,6 +506,83 @@ function RecepcionTab({ sedeId }: { sedeId: string }) {
   )
 }
 
+/* ---------------- Coaches ---------------- */
+
+function CoachesTab({ sedeId }: { sedeId: string }) {
+  const id = useId()
+  const [lista, setLista] = useState<Coach[] | null>(null)
+  const [nuevo, setNuevo] = useState({ nombre: '', email: '' })
+  const acc = useAccion()
+  const cargar = useCallback(() => {
+    api.coaches(sedeId).then(setLista).catch(() => setLista([]))
+  }, [sedeId])
+  useEffect(cargar, [cargar])
+
+  return (
+    <div className="grid-2">
+      <form
+        className="card glass form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          acc.run(async () => {
+            const r = await api.crearCoach(sedeId, nuevo.nombre, nuevo.email)
+            setNuevo({ nombre: '', email: '' })
+            cargar()
+            return r.correoEnviado
+              ? `Listo. Le enviamos a ${r.email} un correo para crear su contraseña.`
+              : `Coach agregado. No se pudo enviar el correo: pídele que entre a "¿La olvidaste?" en el login con ${r.email} para crear su contraseña.`
+          })
+        }}
+      >
+        <h2 className="h3">Agregar coach</h2>
+        <p>Recibe un correo para crear su contraseña. Si ya tiene cuenta (por ejemplo, también es socio), solo se le agrega el rol de coach. Un coach trabaja en una sola sede.</p>
+        <div className="field">
+          <label htmlFor={`${id}-n`}>Nombre</label>
+          <input id={`${id}-n`} required autoComplete="off" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor={`${id}-e`}>Correo</label>
+          <input id={`${id}-e`} required type="email" autoComplete="off" value={nuevo.email} onChange={(e) => setNuevo({ ...nuevo, email: e.target.value })} />
+        </div>
+        {acc.avisos}
+        <button className="btn btn--red" disabled={acc.busy}>{acc.busy ? 'Agregando…' : 'Agregar coach'}</button>
+      </form>
+
+      <div className="card glass form">
+        <h2 className="h3">Coaches de la sede</h2>
+        <div className="lista">
+          {lista === null && <p className="field__hint">Cargando…</p>}
+          {lista?.length === 0 && <p className="field__hint">Todavía no hay coaches en esta sede.</p>}
+          {lista?.map((c) => (
+            <div key={c.id} className="fila">
+              <span className="avatar">{c.fotoUrl ? <img src={c.fotoUrl} alt="" referrerPolicy="no-referrer" /> : (c.nombre ?? c.email)[0].toUpperCase()}</span>
+              <div className="fila__main" style={{ flex: 1 }}>
+                <strong>{c.nombre ?? c.email}</strong>
+                <small>{c.email} · {c.rutinasActivas} {c.rutinasActivas === 1 ? 'rutina activa' : 'rutinas activas'}</small>
+              </div>
+              <button
+                type="button"
+                className="btn btn--glass btn--sm glass"
+                disabled={acc.busy}
+                onClick={() => {
+                  if (!window.confirm(`¿Quitar a ${c.nombre ?? c.email} como coach? Su cuenta y las rutinas que hizo se conservan.`)) return
+                  acc.run(async () => {
+                    await api.quitarCoach(sedeId, c.id)
+                    cargar()
+                    return 'Coach quitado.'
+                  })
+                }}
+              >
+                Quitar
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ---------------- Bitácora ---------------- */
 
 const ACCIONES: Record<string, string> = {
@@ -517,6 +594,16 @@ const ACCIONES: Record<string, string> = {
   'asistencia.rechazada_passback': 'Entrada rechazada (anti-passback)',
   'asistencia.rechazada_sin_membresia': 'Entrada rechazada (sin membresía)',
   'venta.productos': 'Venta de productos',
+  'coach.alta': 'Agregó coach',
+  'coach.baja': 'Quitó coach',
+  'rutina.guardar': 'Guardó rutina',
+  'rutina.quitar': 'Quitó rutina',
+  'maquina.crear': 'Agregó máquina',
+  'maquina.editar': 'Editó máquina',
+  'ejercicio.crear': 'Agregó ejercicio',
+  'ejercicio.editar': 'Editó ejercicio',
+  'salud.actualizar': 'Actualizó datos de salud',
+  'perfil.fisico': 'Actualizó objetivo/estatura',
   'producto.crear': 'Agregó producto',
   'producto.editar': 'Editó producto',
   'inventario.entrada': 'Entrada de mercancía',

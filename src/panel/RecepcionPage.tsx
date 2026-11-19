@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { InventarioTab, VentaTab } from './MostradorTienda'
+import { Pestanas } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import {
   aCentavos,
@@ -15,7 +16,9 @@ import {
   type SocioBusqueda,
   type SolicitudRecepcion,
   type Turno,
+  type Objetivo,
 } from './api'
+import { OBJETIVOS } from './Entrenamiento'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 
@@ -96,22 +99,19 @@ function Recepcion({ yo }: { yo: Yo }) {
             <div className="kpi glass glass--red"><span>Solicitudes pendientes</span><strong>{estado.solicitudesPendientes}</strong></div>
           </div>
 
-          <div className="tabs glass" role="tablist" aria-label="Recepción">
-            {(
-              [
-                ['socios', 'Socios'],
-                ['venta', 'Venta'],
-                ['solicitudes', `Solicitudes${estado.solicitudesPendientes ? ` (${estado.solicitudesPendientes})` : ''}`],
-                ['alta', 'Alta de socio'],
-                ['inventario', 'Inventario'],
-                ['corte', 'Corte de turno'],
-              ] as [Tab, string][]
-            ).map(([t, label]) => (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} className={`tab ${tab === t ? 'is-active' : ''}`} onClick={() => setTab(t)}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <Pestanas<Tab>
+            etiqueta="Acciones de recepción"
+            valor={tab}
+            onCambio={setTab}
+            items={[
+              { id: 'socios', texto: 'Socios', icono: 'socios' },
+              { id: 'venta', texto: 'Venta', icono: 'venta' },
+              { id: 'solicitudes', texto: 'Solicitudes', icono: 'solicitudes', aviso: estado.solicitudesPendientes },
+              { id: 'alta', texto: 'Alta de socio', icono: 'alta' },
+              { id: 'inventario', texto: 'Inventario', icono: 'inventario' },
+              { id: 'corte', texto: 'Corte de turno', icono: 'corte' },
+            ]}
+          />
 
           {tab === 'socios' && (
             <SociosTab sedeId={sedeId} planes={planes} seleccion={seleccion} onSeleccion={setSeleccion} onCambio={recargar} />
@@ -460,7 +460,7 @@ function SolicitudesTab({ sedeId, onCobrar }: { sedeId: string; onCobrar: (perfi
 
 function AltaTab({ sedeId, onAlta }: { sedeId: string; onAlta: (perfilId: string) => void }) {
   const id = useId()
-  const [f, setF] = useState({ nombre: '', email: '', fechaNacimiento: '' })
+  const [f, setF] = useState({ nombre: '', email: '', fechaNacimiento: '', alturaCm: '', pesoKg: '', objetivo: '' as Objetivo | '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -469,7 +469,14 @@ function AltaTab({ sedeId, onAlta }: { sedeId: string; onAlta: (perfilId: string
     setBusy(true)
     setError(null)
     try {
-      const r = await api.alta(sedeId, { nombre: f.nombre, email: f.email, ...(f.fechaNacimiento ? { fechaNacimiento: f.fechaNacimiento } : {}) })
+      const r = await api.alta(sedeId, {
+        nombre: f.nombre,
+        email: f.email,
+        ...(f.fechaNacimiento ? { fechaNacimiento: f.fechaNacimiento } : {}),
+        ...(f.alturaCm ? { alturaCm: Number(f.alturaCm) } : {}),
+        ...(f.pesoKg ? { pesoKg: Number(f.pesoKg.replace(',', '.')) } : {}),
+        ...(f.objetivo ? { objetivo: f.objetivo } : {}),
+      })
       onAlta(r.id)
     } catch (err) {
       setError(msg(err))
@@ -494,6 +501,23 @@ function AltaTab({ sedeId, onAlta }: { sedeId: string; onAlta: (perfilId: string
         <div className="field">
           <label htmlFor={`${id}-f`}>Fecha de nacimiento</label>
           <input id={`${id}-f`} type="date" value={f.fechaNacimiento} onChange={(e) => setF({ ...f, fechaNacimiento: e.target.value })} />
+        </div>
+      </div>
+      <div className="form-row">
+        <div className="field">
+          <label htmlFor={`${id}-a`}>Estatura (cm)</label>
+          <input id={`${id}-a`} inputMode="numeric" pattern="d{2,3}" placeholder="Opcional" value={f.alturaCm} onChange={(e) => setF({ ...f, alturaCm: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor={`${id}-p`}>Peso (kg)</label>
+          <input id={`${id}-p`} inputMode="decimal" pattern="d{2,3}([.,]d{1,2})?" placeholder="Opcional" value={f.pesoKg} onChange={(e) => setF({ ...f, pesoKg: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor={`${id}-o`}>Objetivo</label>
+          <select id={`${id}-o`} className="select" value={f.objetivo} onChange={(e) => setF({ ...f, objetivo: e.target.value as Objetivo | '' })}>
+            <option value="">Lo elige después</option>
+            {OBJETIVOS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
         </div>
       </div>
       {error && <p className="auth__error" role="alert">{error}</p>}

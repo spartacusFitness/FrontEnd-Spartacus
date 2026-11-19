@@ -19,6 +19,16 @@ function useAncho<T extends HTMLElement>() {
   return [ref, w] as const
 }
 
+/** Escala "bonita" ajustada al rango de los datos (para series como el peso, donde el 0 no aporta). */
+function ticksRango(min: number, max: number) {
+  if (max - min < 1e-9) return [Math.floor(min) - 1, Math.ceil(max) + 1]
+  const paso0 = (max - min) / 4
+  const mag = 10 ** Math.floor(Math.log10(paso0))
+  const paso = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => p >= paso0)!
+  const desde = Math.floor(min / paso) * paso
+  return Array.from({ length: Math.ceil((max - desde) / paso) + 1 }, (_, i) => +(desde + i * paso).toFixed(6))
+}
+
 /** Escala "bonita" para el eje Y: 0 … máx en 4 pasos redondos. */
 function ticks(max: number) {
   if (max <= 0) return [0, 1]
@@ -157,12 +167,13 @@ function ColumnasPlot({ datos, formato, alto }: { datos: Punto[]; formato: (v: n
 }
 
 /** Línea con guía vertical (p. ej. entradas por día). Flechas ← → recorren los puntos. */
-export function Linea({ datos, formato, alto = 200, vacio = 'Sin datos en este periodo.' }: { datos: Punto[]; formato: (v: number) => string; alto?: number; vacio?: string }) {
+/** `ajustado`: el eje Y no empieza en 0 sino cerca del mínimo (y sin área rellena, que exageraría). */
+export function Linea({ datos, formato, alto = 200, vacio = 'Sin datos en este periodo.', ajustado = false }: { datos: Punto[]; formato: (v: number) => string; alto?: number; vacio?: string; ajustado?: boolean }) {
   if (!datos.some((d) => d.valor > 0)) return <p className="grafica__vacio">{vacio}</p>
-  return <LineaPlot datos={datos} formato={formato} alto={alto} />
+  return <LineaPlot datos={datos} formato={formato} alto={alto} ajustado={ajustado} />
 }
 
-function LineaPlot({ datos, formato, alto }: { datos: Punto[]; formato: (v: number) => string; alto: number }) {
+function LineaPlot({ datos, formato, alto, ajustado }: { datos: Punto[]; formato: (v: number) => string; alto: number; ajustado: boolean }) {
   const [ref, ancho] = useAncho<HTMLDivElement>()
   const [activo, setActivo] = useState<number | null>(null)
   const id = useId()
@@ -171,10 +182,12 @@ function LineaPlot({ datos, formato, alto }: { datos: Punto[]; formato: (v: numb
   const arriba = 10
   const w = ancho - izq - 10
   const h = alto - abajo - arriba
-  const t = ticks(Math.max(...datos.map((d) => d.valor), 0))
+  const valores = datos.map((d) => d.valor)
+  const t = ajustado ? ticksRango(Math.min(...valores), Math.max(...valores)) : ticks(Math.max(...valores, 0))
+  const min = t[0]
   const max = t[t.length - 1]
   const x = (i: number) => izq + (datos.length <= 1 ? w / 2 : (i / (datos.length - 1)) * w)
-  const y = (v: number) => arriba + h - (v / max) * h
+  const y = (v: number) => arriba + h - ((v - min) / (max - min)) * h
   const linea = datos.map((d, i) => `${i ? 'L' : 'M'}${x(i)},${y(d.valor)}`).join(' ')
   const area = datos.length ? `${linea} L${x(datos.length - 1)},${arriba + h} L${x(0)},${arriba + h} Z` : ''
   const cadaN = Math.ceil(datos.length / Math.max(1, Math.floor(w / 64)))
@@ -202,7 +215,7 @@ function LineaPlot({ datos, formato, alto }: { datos: Punto[]; formato: (v: numb
       onPointerMove={(e) => mover(e.clientX, e.currentTarget.getBoundingClientRect())}
       onPointerLeave={() => setActivo(null)}
     >
-      <span id={`${id}-ayuda`} className="visually-hidden">Usa las flechas izquierda y derecha para recorrer los días.</span>
+      <span id={`${id}-ayuda`} className="visually-hidden">Usa las flechas izquierda y derecha para recorrer los puntos.</span>
       <svg width={ancho} height={alto} role="img" aria-label="Gráfica de línea">
         {t.map((v) => (
           <g key={v}>
@@ -210,7 +223,7 @@ function LineaPlot({ datos, formato, alto }: { datos: Punto[]; formato: (v: numb
             <text x={izq - 8} y={y(v) + 4} textAnchor="end" fill={TEXTO} fontSize={12} style={{ fontVariantNumeric: 'tabular-nums' }}>{formato(v)}</text>
           </g>
         ))}
-        <path d={area} fill={ACENTO} opacity={0.1} />
+        {!ajustado && <path d={area} fill={ACENTO} opacity={0.1} />}
         <path d={linea} fill="none" stroke={ACENTO} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {datos.map((d, i) =>
           i % cadaN === 0 ? <text key={d.clave} x={x(i)} y={alto - 8} textAnchor="middle" fill={TEXTO} fontSize={12}>{d.etiqueta}</text> : null,

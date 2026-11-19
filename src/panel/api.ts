@@ -192,6 +192,106 @@ export interface Resumen {
 
 /* ---------- Admin ---------- */
 
+/* ---------- Fase 3: coaches y entrenamiento ---------- */
+
+export type GrupoMuscular =
+  | 'pecho' | 'espalda' | 'hombro' | 'bicep' | 'tricep' | 'antebrazo' | 'pierna' | 'gluteo' | 'pantorrilla' | 'abdomen' | 'cardio' | 'cuerpo_completo'
+export type Equipo = 'maquina' | 'mancuernas' | 'barra' | 'ligas' | 'kettlebell' | 'polea' | 'peso_corporal' | 'otro'
+export type Objetivo = 'deficit' | 'volumen' | 'recomposicion' | 'condicion' | 'fuerza' | 'salud'
+
+export interface Racha {
+  semana: number
+  diasSemana: string[]
+  consecutiva: number
+  ultimaVisita: string | null
+}
+
+export interface Coach {
+  id: string
+  nombre: string | null
+  email: string
+  fotoUrl: string | null
+  rutinasActivas: number
+}
+
+export interface SocioCoach {
+  id: string
+  nombre: string | null
+  fotoUrl: string | null
+  edad: number | null
+  objetivo: Objetivo | null
+  racha: Racha
+  tieneRutina: boolean
+}
+
+export interface Maquina {
+  id: number
+  nombre: string
+  categoria: GrupoMuscular
+  activa: boolean
+}
+
+export interface Ejercicio {
+  id: number
+  nombre: string
+  categoria: GrupoMuscular
+  equipo: Equipo
+  maquinaId: number | null
+  maquina: string | null
+  series: number
+  repeticiones: string
+  indicaciones: string | null
+  activo: boolean
+}
+
+export interface RutinaEjercicio {
+  ejercicioId: number
+  nombre: string
+  categoria: string
+  equipo: string
+  maquina: string | null
+  series: number
+  repeticiones: string
+  descansoSeg: number | null
+  indicaciones: string | null
+  indicacionesEjercicio: string | null
+}
+
+export interface Rutina {
+  id: number
+  nombre: string
+  notas: string | null
+  coach: string | null
+  actualizada: string
+  dias: { diaSemana: number; categorias: GrupoMuscular[]; notas: string | null; ejercicios: RutinaEjercicio[] }[]
+}
+
+export interface RutinaInput {
+  nombre: string
+  notas?: string | null
+  dias: {
+    diaSemana: number
+    categorias: GrupoMuscular[]
+    notas?: string | null
+    ejercicios: { ejercicioId: number; series: number; repeticiones: string; descansoSeg?: number | null; indicaciones?: string | null }[]
+  }[]
+}
+
+export interface FichaEntrenamiento {
+  id: string
+  nombre: string | null
+  fotoUrl: string | null
+  edad: number | null
+  alturaCm: number | null
+  objetivo: Objetivo | null
+  pesoKg: number | null
+  mediciones: { id: number; fecha: string; pesoKg: number; notas: string | null }[]
+  /** null si quien la ve no es coach de la sede (los datos de salud son privados) */
+  salud: { condiciones: string | null; alergias: string | null } | null
+  racha: Racha
+  rutina: Rutina | null
+}
+
 export const api = {
   /* tienda (admin/encargado; recepción solo ve y registra entradas) */
   productos: (id: string, todos = false) => authed<Producto[]>('GET', `/sedes/${id}/productos${todos ? '?todos=1' : ''}`),
@@ -240,7 +340,7 @@ export const api = {
   solicitudes: (s: string) => authed<SolicitudRecepcion[]>('GET', `/recepcion/${s}/solicitudes`),
   buscar: (s: string, q: string) => authed<SocioBusqueda[]>('GET', `/recepcion/${s}/socios?q=${encodeURIComponent(q)}`),
   ficha: (s: string, perfilId: string) => authed<Ficha>('GET', `/recepcion/${s}/socios/${perfilId}`),
-  alta: (s: string, data: { nombre: string; email: string; fechaNacimiento?: string }) =>
+  alta: (s: string, data: { nombre: string; email: string; fechaNacimiento?: string; alturaCm?: number; pesoKg?: number; objetivo?: Objetivo }) =>
     authed<{ id: string; nombre: string; email: string; correoEnviado: boolean }>('POST', `/recepcion/${s}/socios`, data),
   cobrar: (s: string, data: { perfilId: string; planId: number; metodo: 'efectivo' | 'terminal'; solicitudId?: number; credencialValidada?: boolean }) =>
     authed<{ pagoId: number; total: number; inicio: string; fin: string }>('POST', `/recepcion/${s}/cobros`, data),
@@ -254,4 +354,27 @@ export const api = {
   /* ---------- Socio ---------- */
   miMembresia: () => authed<MiMembresia>('GET', '/yo/membresia'),
   solicitar: (planId: number, metodo: 'mostrador' | 'tarjeta') => authed<{ id: number; estado: string; venceEn: string }>('POST', '/yo/solicitudes', { planId, metodo }),
+  miEntrenamiento: () => authed<FichaEntrenamiento>('GET', '/yo/entrenamiento'),
+  miFisico: (data: { alturaCm?: number | null; objetivo?: Objetivo | null }) => authed<{ ok: true }>('PATCH', '/yo/fisico', data),
+  miSalud: (data: { condiciones: string | null; alergias: string | null }) => authed<{ condiciones: string | null; alergias: string | null }>('PUT', '/yo/salud', data),
+  miPeso: (pesoKg: number) => authed<{ id: number; fecha: string; pesoKg: number }>('POST', '/yo/mediciones', { pesoKg }),
+
+  /* ---------- Coaches (admin / encargado) ---------- */
+  coaches: (id: string) => authed<Coach[]>('GET', `/sedes/${id}/coaches`),
+  crearCoach: (id: string, nombre: string, email: string) => authed<{ id: string; nombre: string; email: string; correoEnviado: boolean }>('POST', `/sedes/${id}/coaches`, { nombre, email }),
+  quitarCoach: (id: string, perfilId: string) => authed<void>('DELETE', `/sedes/${id}/coaches/${perfilId}`),
+
+  /* ---------- Panel del coach ---------- */
+  sociosCoach: (s: string, q = '') => authed<SocioCoach[]>('GET', `/coach/${s}/socios?q=${encodeURIComponent(q)}`),
+  fichaCoach: (s: string, perfilId: string) => authed<FichaEntrenamiento>('GET', `/coach/${s}/socios/${perfilId}`),
+  fisicoCoach: (s: string, perfilId: string, data: { alturaCm?: number | null; objetivo?: Objetivo | null }) => authed<{ ok: true }>('PATCH', `/coach/${s}/socios/${perfilId}`, data),
+  saludCoach: (s: string, perfilId: string, data: { condiciones: string | null; alergias: string | null }) => authed<{ condiciones: string | null; alergias: string | null }>('PUT', `/coach/${s}/socios/${perfilId}/salud`, data),
+  pesoCoach: (s: string, perfilId: string, pesoKg: number) => authed<{ id: number; fecha: string; pesoKg: number }>('POST', `/coach/${s}/socios/${perfilId}/mediciones`, { pesoKg }),
+  guardarRutina: (s: string, perfilId: string, data: RutinaInput) => authed<Rutina>('PUT', `/coach/${s}/socios/${perfilId}/rutina`, data),
+  quitarRutina: (s: string, perfilId: string) => authed<void>('DELETE', `/coach/${s}/socios/${perfilId}/rutina`),
+  catalogoEntrenamiento: (s: string) => authed<{ maquinas: Maquina[]; ejercicios: Ejercicio[] }>('GET', `/coach/${s}/catalogo`),
+  crearMaquina: (s: string, data: { nombre: string; categoria: GrupoMuscular }) => authed<Maquina>('POST', `/coach/${s}/maquinas`, data),
+  editarMaquina: (s: string, id: number, data: Partial<Pick<Maquina, 'nombre' | 'categoria' | 'activa'>>) => authed<Maquina>('PATCH', `/coach/${s}/maquinas/${id}`, data),
+  crearEjercicio: (s: string, data: Omit<Ejercicio, 'id' | 'maquina' | 'activo'>) => authed<Ejercicio>('POST', `/coach/${s}/ejercicios`, data),
+  editarEjercicio: (s: string, id: number, data: Partial<Omit<Ejercicio, 'id' | 'maquina'>>) => authed<Ejercicio>('PATCH', `/coach/${s}/ejercicios/${id}`, data),
 }

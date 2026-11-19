@@ -4,6 +4,7 @@ import Background from '../Background'
 import { ApiError, salir, yo as cargarYo, type Rol, type Yo } from '../auth/api'
 import { supabase } from '../lib/supabase'
 import '../auth/auth.css'
+import { IconoNav, type IconoUI } from './Navegacion'
 import './panel.css'
 
 export const tiene = (yo: Yo, ...roles: Rol[]) => yo.roles.some((r) => roles.includes(r.rol))
@@ -80,6 +81,23 @@ export function PanelLayout({
   }
 
   const yo = estado.tipo === 'listo' ? estado.yo : null
+  const enlaces: { to: string; texto: string; corto: string; icono: IconoUI }[] = yo
+    ? [
+        ...(tiene(yo, 'admin', 'encargado') ? [{ to: '/admin', texto: 'Administración', corto: 'Admin', icono: 'admin' as const }] : []),
+        ...(tiene(yo, 'admin', 'encargado', 'recepcion') ? [{ to: '/recepcion', texto: 'Recepción', corto: 'Recepción', icono: 'recepcion' as const }] : []),
+        ...(tiene(yo, 'admin', 'encargado', 'coach') ? [{ to: '/coach', texto: 'Coach', corto: 'Coach', icono: 'coaches' as const }] : []),
+        ...(tiene(yo, 'socio') ? [{ to: '/mi-membresia', texto: 'Mi membresía', corto: 'Membresía', icono: 'membresia' as const }] : []),
+      ]
+    : []
+  const links = (clase: string, corto = false) =>
+    enlaces.map((e) => (
+      <li key={e.to}>
+        <NavLink to={e.to} className={clase} aria-label={corto ? e.texto : undefined}>
+          <IconoNav nombre={e.icono} />
+          <span>{corto ? e.corto : e.texto}</span>
+        </NavLink>
+      </li>
+    ))
 
   return (
     <>
@@ -89,27 +107,29 @@ export function PanelLayout({
           <img src="/images/logos/casco-oscuro.png" alt="" width={34} height={27} />
           Spartacus
         </Link>
-        {yo && (
-          <nav aria-label="Secciones del panel">
-            <ul className="nav__links panel-nav__links">
-              {tiene(yo, 'admin', 'encargado') && <li><NavLink to="/admin">Administración</NavLink></li>}
-              {tiene(yo, 'admin', 'encargado', 'recepcion') && <li><NavLink to="/recepcion">Recepción</NavLink></li>}
-              {tiene(yo, 'socio') && <li><NavLink to="/mi-membresia">Mi membresía</NavLink></li>}
-            </ul>
+        {enlaces.length > 1 && (
+          <nav aria-label="Secciones del panel" className="panel-nav__arriba">
+            <ul className="panel-nav__links">{links('panel-nav__link')}</ul>
           </nav>
         )}
         <div className="nav__end">
           {yo && <span className="panel-nav__user">{yo.nombre ?? yo.email}</span>}
           <button
             type="button"
-            className="btn btn--glass btn--sm glass"
+            className="btn btn--glass btn--sm glass panel-nav__salir"
             onClick={() => salir().finally(() => window.location.assign('/login'))}
           >
-            Salir
+            <IconoNav nombre="salir" size={18} />
+            <span>Salir</span>
           </button>
         </div>
       </header>
-      <main className="panel wrap">{contenido}</main>
+      <main className={`panel wrap ${enlaces.length > 1 ? 'panel--con-barra' : ''}`}>{contenido}</main>
+      {enlaces.length > 1 && (
+        <nav aria-label="Secciones del panel" className="panel-abajo glass">
+          <ul>{links('panel-abajo__link', true)}</ul>
+        </nav>
+      )}
     </>
   )
 }
@@ -126,6 +146,6 @@ export function PanelInicio() {
     )
   }
   const yo = estado.yo
-  const destino = tiene(yo, 'admin', 'encargado') ? '/admin' : tiene(yo, 'recepcion') ? '/recepcion' : '/mi-membresia'
+  const destino = tiene(yo, 'admin', 'encargado') ? '/admin' : tiene(yo, 'recepcion') ? '/recepcion' : tiene(yo, 'coach') ? '/coach' : '/mi-membresia'
   return <Navigate to={destino} replace />
 }

@@ -60,7 +60,7 @@ async function accessToken(): Promise<string> {
   return data.session.access_token
 }
 
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 async function request<T>(method: Method, path: string, body?: unknown, bearer?: string): Promise<T> {
   const payload = body === undefined ? '' : JSON.stringify(body)
