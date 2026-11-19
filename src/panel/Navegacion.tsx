@@ -74,7 +74,7 @@ export function Pestanas<T extends string>({ items, valor, onCambio, etiqueta }:
   useEffect(() => {
     ultimo.current = { items, valor, onCambio }
   })
-  const firma = items.map((i) => `${i.id}:${i.texto}:${i.aviso ?? ''}:${i.principal ? 1 : 0}`).join('|') + '#' + valor
+  const firma = items.map((i) => `${i.id}:${i.texto}:${i.icono}:${i.aviso ?? ''}:${i.principal ? 1 : 0}`).join('|') + '#' + valor
   useEffect(() => {
     ctx?.registrar({ items: items as Pestana<string>[], valor, onCambio: (t) => ultimo.current.onCambio(t as T) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
