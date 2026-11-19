@@ -61,7 +61,7 @@ function secciones(yo: Yo): { propias: Seccion[]; operar: Seccion[] } {
   else if (gestion) operar.push(rec)
   if (tiene(yo, 'coach')) propias.push(coach)
   else if (gestion) operar.push(coach)
-  if (tiene(yo, 'socio')) propias.push({ to: '/mi-membresia', texto: 'Mi membresía', corto: 'Membresía', icono: 'membresia' })
+  if (tiene(yo, 'socio')) propias.push({ to: '/mi-membresia', texto: 'Mi app', corto: 'Mi app', icono: 'inicio' })
   return { propias, operar }
 }
 

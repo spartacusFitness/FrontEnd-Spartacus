@@ -277,6 +277,23 @@ export interface RutinaInput {
   }[]
 }
 
+export type Sexo = 'mujer' | 'hombre'
+
+export interface Nutricion {
+  faltan: string[]
+  calorias: number | null
+  proteinaG: number | null
+  grasaG: number | null
+  carbohidratosG: number | null
+  aguaL: number | null
+  actividad: string
+  enfoque: string
+  comidas: { momento: string; opciones: string[] }[]
+  consejos: string[]
+  avisos: string[]
+  alergenosEvitados: string[]
+}
+
 export interface FichaEntrenamiento {
   id: string
   nombre: string | null
@@ -284,6 +301,7 @@ export interface FichaEntrenamiento {
   edad: number | null
   alturaCm: number | null
   objetivo: Objetivo | null
+  sexo: Sexo | null
   pesoKg: number | null
   mediciones: { id: number; fecha: string; pesoKg: number; notas: string | null }[]
   /** null si quien la ve no es coach de la sede (los datos de salud son privados) */
@@ -355,8 +373,9 @@ export const api = {
   miMembresia: () => authed<MiMembresia>('GET', '/yo/membresia'),
   solicitar: (planId: number, metodo: 'mostrador' | 'tarjeta') => authed<{ id: number; estado: string; venceEn: string }>('POST', '/yo/solicitudes', { planId, metodo }),
   miEntrenamiento: () => authed<FichaEntrenamiento>('GET', '/yo/entrenamiento'),
-  miFisico: (data: { alturaCm?: number | null; objetivo?: Objetivo | null }) => authed<{ ok: true }>('PATCH', '/yo/fisico', data),
+  miFisico: (data: { alturaCm?: number | null; objetivo?: Objetivo | null; sexo?: Sexo | null }) => authed<{ ok: true }>('PATCH', '/yo/fisico', data),
   miSalud: (data: { condiciones: string | null; alergias: string | null }) => authed<{ condiciones: string | null; alergias: string | null }>('PUT', '/yo/salud', data),
+  miNutricion: () => authed<Nutricion>('GET', '/yo/nutricion'),
   miPeso: (pesoKg: number) => authed<{ id: number; fecha: string; pesoKg: number }>('POST', '/yo/mediciones', { pesoKg }),
 
   /* ---------- Coaches (admin / encargado) ---------- */

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, type Yo } from '../auth/api'
-import { PanelLayout, tiene } from './PanelLayout'
+import { ApiError, actualizarPerfil, subirFoto, type Yo } from '../auth/api'
+import { AvancePeso, DIAS_LARGO, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, hoyDia, objetivo } from './Entrenamiento'
 import { Icono } from './Icono'
-import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Objetivo, type Plan } from './api'
-import { AvancePeso, OBJETIVOS, RachaVista, RutinaVista } from './Entrenamiento'
+import { Pestanas } from './Navegacion'
+import { PanelLayout, tiene } from './PanelLayout'
+import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Nutricion, type Objetivo, type Plan, type Sexo } from './api'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 
@@ -18,26 +19,58 @@ const ESTADO: Record<string, string> = {
 
 export default function SocioPage() {
   return (
-    <PanelLayout titulo="Mi membresía" permitido={(yo) => tiene(yo, 'socio') || !!yo.sede}>
-      {(yo) => <MiPanel yo={yo} />}
+    <PanelLayout titulo="Mi app" permitido={(yo) => tiene(yo, 'socio') || !!yo.sede}>
+      {(yo) => <MiApp yo={yo} />}
     </PanelLayout>
   )
 }
 
-function MiPanel({ yo }: { yo: Yo }) {
+type Tab = 'inicio' | 'rutina' | 'nutricion' | 'pagos' | 'tienda' | 'perfil'
+
+/** Acción con su propio aviso (ok / error) y estado de carga. */
+function useAccion() {
+  const [busy, setBusy] = useState(false)
+  const [aviso, setAviso] = useState<{ ok?: string; error?: string } | null>(null)
+  const run = async (fn: () => Promise<string | void>) => {
+    setBusy(true)
+    setAviso(null)
+    try {
+      const m = await fn()
+      if (m) setAviso({ ok: m })
+    } catch (e) {
+      setAviso({ error: msg(e) })
+    } finally {
+      setBusy(false)
+    }
+  }
+  const avisos: ReactNode = aviso?.error ? <p className="auth__error" role="alert">{aviso.error}</p> : aviso?.ok ? <p className="auth__ok" role="status">{aviso.ok}</p> : null
+  return { busy, run, avisos }
+}
+
+function MiApp({ yo: yoInicial }: { yo: Yo }) {
+  const [yo, setYo] = useState(yoInicial)
+  const [tab, setTab] = useState<Tab>('inicio')
   const [m, setM] = useState<MiMembresia | null>(null)
   const [planes, setPlanes] = useState<Plan[]>([])
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
-  const [busy, setBusy] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [ok, setOk] = useState<string | null>(null)
+  const [ficha, setFicha] = useState<FichaEntrenamiento | null>(null)
+  const [nutri, setNutri] = useState<Nutricion | null>(null)
+  const esSocio = tiene(yo, 'socio')
 
-  const cargar = useCallback(() => {
-    api.miMembresia().then(setM).catch((e) => setError(msg(e)))
+  const cargarMembresia = useCallback(() => {
+    api.miMembresia().then(setM).catch(() => {})
     if (yo.sede) api.planes(yo.sede.id).then(setPlanes).catch(() => {})
-    api.catalogo().then(setCatalogo).catch(() => {})
   }, [yo.sede])
-  useEffect(cargar, [cargar])
+  const cargarEntreno = useCallback(() => {
+    if (!esSocio) return
+    api.miEntrenamiento().then(setFicha).catch(() => {})
+    api.miNutricion().then(setNutri).catch(() => {})
+  }, [esSocio])
+  useEffect(() => {
+    cargarMembresia()
+    cargarEntreno()
+    api.catalogo().then(setCatalogo).catch(() => {})
+  }, [cargarMembresia, cargarEntreno])
 
   if (!yo.sede) {
     return (
@@ -49,6 +82,202 @@ function MiPanel({ yo }: { yo: Yo }) {
     )
   }
 
+  const nombreCorto = yo.apodo ?? yo.nombre?.split(' ')[0] ?? 'atleta'
+  const promosHoy = catalogo?.promociones.length ?? 0
+
+  return (
+    <>
+      <div className="panel-head">
+        <div>
+          <h1>Hola, {nombreCorto}</h1>
+          <p>Sede {yo.sede.nombre}</p>
+        </div>
+      </div>
+
+      <Pestanas<Tab>
+        etiqueta="Mi app"
+        valor={tab}
+        onCambio={setTab}
+        items={[
+          { id: 'inicio', texto: 'Inicio', icono: 'inicio', principal: true },
+          { id: 'rutina', texto: 'Rutina', icono: 'coaches', principal: true },
+          { id: 'nutricion', texto: 'Nutrición', icono: 'nutricion', principal: true },
+          { id: 'pagos', texto: 'Pagos', icono: 'membresia', principal: true },
+          { id: 'tienda', texto: 'Tienda', icono: 'venta', aviso: promosHoy || undefined },
+          { id: 'perfil', texto: 'Perfil', icono: 'perfil' },
+        ]}
+      />
+
+      {tab === 'inicio' && <Inicio m={m} ficha={ficha} nutri={nutri} promosHoy={promosHoy} ir={setTab} />}
+      {tab === 'rutina' && (
+        <div className="card glass form">
+          {ficha?.rutina ? <RutinaVista rutina={ficha.rutina} /> : <p>Tu coach todavía no te asigna rutina. Pídesela en tu siguiente visita.</p>}
+        </div>
+      )}
+      {tab === 'nutricion' && <NutricionVista nutri={nutri} ir={setTab} />}
+      {tab === 'pagos' && <Pagos yo={yo} m={m} planes={planes} onCambio={cargarMembresia} />}
+      {tab === 'tienda' && <Tienda catalogo={catalogo} />}
+      {tab === 'perfil' && (
+        <Perfil
+          yo={yo}
+          ficha={ficha}
+          onYo={setYo}
+          onCambio={cargarEntreno}
+        />
+      )}
+    </>
+  )
+}
+
+/* ---------------- Inicio ---------------- */
+
+function Inicio({ m, ficha, nutri, promosHoy, ir }: { m: MiMembresia | null; ficha: FichaEntrenamiento | null; nutri: Nutricion | null; promosHoy: number; ir: (t: Tab) => void }) {
+  const hoy = hoyDia()
+  const rutina = ficha?.rutina
+  const deHoy = rutina?.dias.find((d) => d.diaSemana === hoy)
+  const siguiente = rutina ? [...SEMANA.slice(SEMANA.indexOf(hoy) + 1), ...SEMANA.slice(0, SEMANA.indexOf(hoy) + 1)].find((d) => rutina.dias.some((x) => x.diaSemana === d)) : undefined
+  return (
+    <>
+      <div className={`card glass inicio-membresia ${m?.vigente ? 'glass--red' : ''}`}>
+        <div>
+          <span className="field__hint">Mi membresía</span>
+          <h2 className="h3">{m ? (m.vigente ? m.vigente.plan : 'Sin membresía activa') : '…'}</h2>
+          {m?.vigente ? <p>Vigente hasta el <strong>{fechaLarga(m.vigente.fin)}</strong></p> : m && <p>Elige un plan para empezar a entrenar.</p>}
+        </div>
+        <button type="button" className={`btn ${m?.vigente ? 'btn--glass glass' : 'btn--white'}`} onClick={() => ir('pagos')}>
+          {m?.vigente ? 'Renovar' : 'Ver planes'}
+        </button>
+      </div>
+
+      <div className="grid-2">
+        <div className="card glass">
+          <h2 className="h3">Mi racha</h2>
+          {ficha ? <RachaVista racha={ficha.racha} /> : <p className="field__hint">Cargando…</p>}
+        </div>
+        <div className="card glass form">
+          <h2 className="h3">Hoy toca</h2>
+          {!rutina && <p>Aún no tienes rutina. Tu coach te la asigna en tu siguiente visita.</p>}
+          {rutina && !deHoy && (
+            <p>
+              Hoy descansas.{siguiente !== undefined && <> Tu próximo entrenamiento es el <strong>{DIAS_LARGO[siguiente].toLowerCase()}</strong>.</>}
+            </p>
+          )}
+          {deHoy && (
+            <>
+              <p className="hoy-toca__grupos">{deHoy.categorias.map(grupo).join(' · ') || rutina!.nombre}</p>
+              <ol className="hoy-toca">
+                {deHoy.ejercicios.map((e, i) => (
+                  <li key={i}>
+                    <span>{e.nombre}<small>{e.maquina ?? equipo(e.equipo)}</small></span>
+                    <strong>{e.series} × {e.repeticiones}</strong>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+          {rutina && <button type="button" className="btn btn--glass glass" onClick={() => ir('rutina')}>Ver rutina de la semana</button>}
+        </div>
+      </div>
+
+      <div className="grid-2">
+        <div className="card glass form">
+          <h2 className="h3">Mi nutrición</h2>
+          {!nutri && <p className="field__hint">Cargando…</p>}
+          {nutri && nutri.calorias === null && (
+            <>
+              <p>Para calcular tu plan nos falta {nutri.faltan.join(', ')}.</p>
+              <button type="button" className="btn btn--red" onClick={() => ir('perfil')}>Completar mi perfil</button>
+            </>
+          )}
+          {nutri?.calorias && (
+            <>
+              <p>
+                <strong className="hero-num">{nutri.calorias.toLocaleString('es-MX')}</strong> <span className="field__hint">kcal al día · {objetivo(ficha?.objetivo ?? null)}</span>
+              </p>
+              <Macros n={nutri} />
+              <button type="button" className="btn btn--glass glass" onClick={() => ir('nutricion')}>Ver mi plan de comidas</button>
+            </>
+          )}
+        </div>
+        <div className="card glass form">
+          <h2 className="h3">Comunidad</h2>
+          <p>Muy pronto: comparte tu racha y tus logros con la comunidad de Spartacus.</p>
+          {promosHoy > 0 && (
+            <button type="button" className="btn btn--red" onClick={() => ir('tienda')}>
+              {promosHoy === 1 ? 'Hay 1 promoción hoy' : `Hay ${promosHoy} promociones hoy`}
+            </button>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function Macros({ n }: { n: Nutricion }) {
+  return (
+    <div className="macros">
+      <div><strong>{n.proteinaG} g</strong><span>Proteína</span></div>
+      <div><strong>{n.carbohidratosG} g</strong><span>Carbohidratos</span></div>
+      <div><strong>{n.grasaG} g</strong><span>Grasa</span></div>
+      <div><strong>{n.aguaL} L</strong><span>Agua</span></div>
+    </div>
+  )
+}
+
+/* ---------------- Nutrición ---------------- */
+
+function NutricionVista({ nutri, ir }: { nutri: Nutricion | null; ir: (t: Tab) => void }) {
+  if (!nutri) return <div className="card glass panel-msg"><span className="auth__spinner" aria-hidden="true" /> Cargando…</div>
+  return (
+    <>
+      <div className="card glass form">
+        <h2 className="h3">Mi plan de nutrición</h2>
+        <p>{nutri.enfoque}</p>
+        {nutri.calorias ? (
+          <>
+            <p>
+              <strong className="hero-num">{nutri.calorias.toLocaleString('es-MX')}</strong> <span className="field__hint">kcal al día</span>
+            </p>
+            <Macros n={nutri} />
+            <p className="field__hint">Actividad: {nutri.actividad} (según tus visitas de las últimas 4 semanas).</p>
+          </>
+        ) : (
+          <>
+            <p>Para calcular tus calorías nos falta {nutri.faltan.join(', ')}. Mientras, aquí tienes ideas de comidas.</p>
+            <button type="button" className="btn btn--red" onClick={() => ir('perfil')}>Completar mi perfil</button>
+          </>
+        )}
+        {nutri.alergenosEvitados.length > 0 && <p className="tag tag--warn" style={{ justifySelf: 'start' }}>Sin {nutri.alergenosEvitados.join(', ')}</p>}
+      </div>
+
+      <div className="grid-2">
+        {nutri.comidas.map((c) => (
+          <div key={c.momento} className="card glass">
+            <h3 className="h3 comida__titulo">{c.momento}</h3>
+            <ul className="comida__lista">
+              {c.opciones.map((o) => <li key={o}>{o}</li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="card glass form">
+        <h3 className="h3 comida__titulo">Consejos</h3>
+        <ul className="comida__lista">
+          {nutri.consejos.map((c) => <li key={c}>{c}</li>)}
+        </ul>
+        {nutri.avisos.map((a) => <p key={a} className="field__hint">{a}</p>)}
+      </div>
+    </>
+  )
+}
+
+/* ---------------- Pagos ---------------- */
+
+function Pagos({ yo, m, planes, onCambio }: { yo: Yo; m: MiMembresia | null; planes: Plan[]; onCambio: () => void }) {
+  const [busy, setBusy] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [ok, setOk] = useState<string | null>(null)
   const pendiente = m?.solicitudes.find((s) => s.estado === 'pendiente_pago' || s.estado === 'pagada')
 
   const pedir = async (plan: Plan) => {
@@ -58,7 +287,7 @@ function MiPanel({ yo }: { yo: Yo }) {
     try {
       const s = await api.solicitar(plan.id, 'mostrador')
       setOk(`Listo. Preséntate en recepción de ${yo.sede!.nombre} antes del ${horaMx(s.venceEn)} para pagar ${pesos(plan.precio)} y activar tu ${plan.nombre}.`)
-      cargar()
+      onCambio()
     } catch (e) {
       setError(msg(e))
     } finally {
@@ -68,21 +297,10 @@ function MiPanel({ yo }: { yo: Yo }) {
 
   return (
     <>
-      <div className="panel-head">
-        <div>
-          <h1>Mi membresía</h1>
-          <p>Sede {yo.sede.nombre}</p>
-        </div>
-      </div>
-
       <div className="grid-2">
         <div className={`card glass ${m?.vigente ? 'glass--red' : ''}`}>
           <h2 className="h3">{m?.vigente ? m.vigente.plan : 'Sin membresía activa'}</h2>
-          {m?.vigente ? (
-            <p style={{ fontSize: 20 }}>Vigente hasta el <strong>{fechaLarga(m.vigente.fin)}</strong></p>
-          ) : (
-            <p>Elige un plan y págalo en recepción para empezar a entrenar.</p>
-          )}
+          {m?.vigente ? <p style={{ fontSize: 20 }}>Vigente hasta el <strong>{fechaLarga(m.vigente.fin)}</strong></p> : <p>Elige un plan y págalo para empezar a entrenar.</p>}
         </div>
         <div className="card glass">
           <h2 className="h3">Mis solicitudes</h2>
@@ -106,6 +324,7 @@ function MiPanel({ yo }: { yo: Yo }) {
 
       <div className="card glass">
         <h2 className="h3">{m?.vigente ? 'Renovar o cambiar de plan' : 'Planes de tu sede'}</h2>
+        {planes.length === 0 && <p className="field__hint">Tu sede todavía no publica sus planes. Pregunta en recepción.</p>}
         <div className="grid-3">
           {planes.map((p) => (
             <div key={p.id} className="kpi glass form">
@@ -132,111 +351,132 @@ function MiPanel({ yo }: { yo: Yo }) {
         </div>
         {pendiente && <p className="field__hint" style={{ marginTop: 12 }}>Ya tienes una solicitud pendiente; complétala en recepción.</p>}
       </div>
-
-      {catalogo && (catalogo.promociones.length > 0 || catalogo.productos.length > 0) && (
-        <div className="card glass form">
-          <h2 className="h3">Promociones y productos</h2>
-          <p className="field__hint">Se pagan en recepción, en efectivo o con tarjeta.</p>
-          {catalogo.promociones.length > 0 && (
-            <div className="grid-3">
-              {catalogo.promociones.map((p) => (
-                <article key={p.id} className="kpi glass glass--red form">
-                  {p.imagenUrl && <img className="promo-img" src={p.imagenUrl} alt={p.nombre} loading="lazy" />}
-                  <span style={{ color: '#fff' }}>Hoy</span>
-                  <strong>{p.nombre}</strong>
-                  <small>{p.productos.map((x) => `${x.cantidad}× ${x.nombre}`).join(' + ')}</small>
-                  <strong>{pesos(p.precio)}</strong>
-                  {p.descripcion && <small>{p.descripcion}</small>}
-                </article>
-              ))}
-            </div>
-          )}
-          <div className="productos-grid">
-            {catalogo.productos.map((p) => (
-              <div key={p.id} className="prod" style={{ cursor: 'default' }} aria-disabled={!p.disponible}>
-                <span className="prod__icono"><Icono nombre={p.icono} /></span>
-                <strong>{p.nombre}</strong>
-                <small>{p.disponible ? 'Disponible' : 'Agotado'}</small>
-                <span>{pesos(p.precio)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {tiene(yo, 'socio') && <MiEntrenamiento />}
     </>
   )
 }
 
-/* ---------------- Mi entrenamiento (fase 3) ---------------- */
+/* ---------------- Tienda ---------------- */
 
-function MiEntrenamiento() {
-  const id = useId()
-  const [f, setF] = useState<FichaEntrenamiento | null>(null)
-  const [salud, setSalud] = useState({ condiciones: '', alergias: '' })
-  const [fisico, setFisico] = useState({ alturaCm: '', objetivo: '' as Objetivo | '' })
-  const [busy, setBusy] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<{ donde: string; ok?: string; error?: string } | null>(null)
-
-  const cargar = useCallback(
-    () =>
-      api
-        .miEntrenamiento()
-        .then((x) => {
-          setF(x)
-          setSalud({ condiciones: x.salud?.condiciones ?? '', alergias: x.salud?.alergias ?? '' })
-          setFisico({ alturaCm: x.alturaCm ? String(x.alturaCm) : '', objetivo: x.objetivo ?? '' })
-        })
-        .catch(() => {}),
-    [],
-  )
-  useEffect(() => {
-    cargar()
-  }, [cargar])
-
-  const run = async (donde: string, fn: () => Promise<string>) => {
-    setBusy(donde)
-    setAviso(null)
-    try {
-      setAviso({ donde, ok: await fn() })
-    } catch (e) {
-      setAviso({ donde, error: msg(e) })
-    } finally {
-      setBusy(null)
-    }
+function Tienda({ catalogo }: { catalogo: Catalogo | null }) {
+  if (!catalogo) return <div className="card glass panel-msg"><span className="auth__spinner" aria-hidden="true" /> Cargando…</div>
+  if (!catalogo.promociones.length && !catalogo.productos.length) {
+    return <div className="card glass panel-msg"><p>Tu sede todavía no publica productos ni promociones.</p></div>
   }
-  const avisos = (donde: string) =>
-    aviso?.donde === donde && (aviso.error ? <p className="auth__error" role="alert">{aviso.error}</p> : <p className="auth__ok" role="status">{aviso.ok}</p>)
+  return (
+    <div className="card glass form">
+      <h2 className="h3">Promociones y productos</h2>
+      <p className="field__hint">Se pagan en recepción, en efectivo o con tarjeta.</p>
+      {catalogo.promociones.length > 0 && (
+        <div className="grid-3">
+          {catalogo.promociones.map((p) => (
+            <article key={p.id} className="kpi glass glass--red form">
+              {p.imagenUrl && <img className="promo-img" src={p.imagenUrl} alt={p.nombre} loading="lazy" />}
+              <span style={{ color: '#fff' }}>Hoy</span>
+              <strong>{p.nombre}</strong>
+              <small>{p.productos.map((x) => `${x.cantidad}× ${x.nombre}`).join(' + ')}</small>
+              <strong>{pesos(p.precio)}</strong>
+              {p.descripcion && <small>{p.descripcion}</small>}
+            </article>
+          ))}
+        </div>
+      )}
+      <div className="productos-grid">
+        {catalogo.productos.map((p) => (
+          <div key={p.id} className="prod" style={{ cursor: 'default' }} aria-disabled={!p.disponible}>
+            <span className="prod__icono"><Icono nombre={p.icono} /></span>
+            <strong>{p.nombre}</strong>
+            <small>{p.disponible ? 'Disponible' : 'Agotado'}</small>
+            <span>{pesos(p.precio)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-  if (!f) return null
+/* ---------------- Perfil ---------------- */
+
+function Perfil({ yo, ficha, onYo, onCambio }: { yo: Yo; ficha: FichaEntrenamiento | null; onYo: (y: Yo) => void; onCambio: () => void }) {
+  const id = useId()
+  const [datos, setDatos] = useState({ nombre: yo.nombre ?? '', apodo: yo.apodo ?? '', fechaNacimiento: yo.fechaNacimiento ?? '' })
+  const [fisico, setFisico] = useState({ alturaCm: '', objetivo: '' as Objetivo | '', sexo: '' as Sexo | '' })
+  const [salud, setSalud] = useState({ condiciones: '', alergias: '' })
+  const accFoto = useAccion()
+  const accDatos = useAccion()
+  const accFisico = useAccion()
+  const accSalud = useAccion()
+  const accPeso = useAccion()
+
+  useEffect(() => {
+    if (!ficha) return
+    setFisico({ alturaCm: ficha.alturaCm ? String(ficha.alturaCm) : '', objetivo: ficha.objetivo ?? '', sexo: ficha.sexo ?? '' })
+    setSalud({ condiciones: ficha.salud?.condiciones ?? '', alergias: ficha.salud?.alergias ?? '' })
+  }, [ficha])
+
   return (
     <>
-      <h2 className="h2 seccion-titulo">Mi entrenamiento</h2>
       <div className="grid-2">
-        <div className="card glass">
-          <h3 className="h3">Mi racha</h3>
-          <RachaVista racha={f.racha} />
-        </div>
         <div className="card glass form">
-          <h3 className="h3">Mi rutina</h3>
-          {f.rutina ? <RutinaVista rutina={f.rutina} /> : <p>Tu coach todavía no te asigna rutina. Pídesela en tu siguiente visita.</p>}
+          <h2 className="h3">Mi perfil</h2>
+          <div className="socio-head">
+            <span className="avatar avatar--lg">{yo.fotoUrl ? <img src={yo.fotoUrl} alt="" referrerPolicy="no-referrer" /> : (yo.nombre ?? '?')[0].toUpperCase()}</span>
+            <label className="btn btn--glass btn--sm glass" style={{ cursor: 'pointer' }}>
+              {accFoto.busy ? 'Subiendo…' : 'Cambiar foto'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="visually-hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) accFoto.run(async () => { onYo(await subirFoto(f)); return 'Foto actualizada.' })
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          </div>
+          {accFoto.avisos}
+          <form
+            className="form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              accDatos.run(async () => {
+                onYo(await actualizarPerfil({ nombre: datos.nombre, ...(datos.apodo ? { apodo: datos.apodo } : {}), ...(datos.fechaNacimiento ? { fechaNacimiento: datos.fechaNacimiento } : {}) }))
+                onCambio()
+                return 'Datos guardados.'
+              })
+            }}
+          >
+            <div className="field">
+              <label htmlFor={`${id}-n`}>Nombre</label>
+              <input id={`${id}-n`} required minLength={2} value={datos.nombre} onChange={(e) => setDatos({ ...datos, nombre: e.target.value })} />
+            </div>
+            <div className="form-row">
+              <div className="field">
+                <label htmlFor={`${id}-a`}>Apodo (para la comunidad)</label>
+                <input id={`${id}-a`} placeholder="Ej. dani.fit" value={datos.apodo} onChange={(e) => setDatos({ ...datos, apodo: e.target.value })} />
+              </div>
+              <div className="field">
+                <label htmlFor={`${id}-f`}>Fecha de nacimiento</label>
+                <input id={`${id}-f`} type="date" value={datos.fechaNacimiento} onChange={(e) => setDatos({ ...datos, fechaNacimiento: e.target.value })} />
+              </div>
+            </div>
+            {accDatos.avisos}
+            <button className="btn btn--glass glass" disabled={accDatos.busy}>Guardar</button>
+          </form>
         </div>
-      </div>
 
-      <div className="grid-2">
         <form
           className="card glass form"
           onSubmit={(e) => {
             e.preventDefault()
-            run('fisico', async () => {
-              await api.miFisico({ alturaCm: fisico.alturaCm ? Number(fisico.alturaCm) : null, objetivo: fisico.objetivo || null })
-              await cargar()
-              return 'Guardado. Tu coach ya lo ve.'
+            accFisico.run(async () => {
+              await api.miFisico({ alturaCm: fisico.alturaCm ? Number(fisico.alturaCm) : null, objetivo: fisico.objetivo || null, sexo: fisico.sexo || null })
+              onCambio()
+              return 'Guardado. Tu coach ya lo ve y tu plan de nutrición se actualizó.'
             })
           }}
         >
-          <h3 className="h3">Mi objetivo</h3>
+          <h2 className="h3">Mi objetivo</h2>
           <div className="field">
             <label htmlFor={`${id}-o`}>Objetivo</label>
             <select id={`${id}-o`} className="select" value={fisico.objetivo} onChange={(e) => setFisico({ ...fisico, objetivo: e.target.value as Objetivo | '' })}>
@@ -244,26 +484,40 @@ function MiEntrenamiento() {
               {OBJETIVOS.map(([k, l, d]) => <option key={k} value={k}>{l} — {d}</option>)}
             </select>
           </div>
-          <div className="field">
-            <label htmlFor={`${id}-a`}>Estatura (cm)</label>
-            <input id={`${id}-a`} inputMode="numeric" pattern="d{2,3}" placeholder="Ej. 170" value={fisico.alturaCm} onChange={(e) => setFisico({ ...fisico, alturaCm: e.target.value })} />
+          <div className="form-row">
+            <div className="field">
+              <label htmlFor={`${id}-e`}>Estatura (cm)</label>
+              <input id={`${id}-e`} inputMode="numeric" pattern="\d{2,3}" placeholder="Ej. 170" value={fisico.alturaCm} onChange={(e) => setFisico({ ...fisico, alturaCm: e.target.value })} />
+            </div>
+            <div className="field">
+              <label htmlFor={`${id}-s`}>Sexo</label>
+              <select id={`${id}-s`} className="select" value={fisico.sexo} onChange={(e) => setFisico({ ...fisico, sexo: e.target.value as Sexo | '' })}>
+                <option value="">Prefiero no decir</option>
+                <option value="mujer">Mujer</option>
+                <option value="hombre">Hombre</option>
+              </select>
+            </div>
           </div>
-          {avisos('fisico')}
-          <button className="btn btn--glass glass" disabled={busy === 'fisico'}>Guardar</button>
+          <p className="field__hint">El sexo solo se usa para calcular tus calorías.</p>
+          {accFisico.avisos}
+          <button className="btn btn--glass glass" disabled={accFisico.busy}>Guardar</button>
         </form>
+      </div>
 
+      <div className="grid-2">
         <form
           className="card glass form"
           onSubmit={(e) => {
             e.preventDefault()
-            run('salud', async () => {
+            accSalud.run(async () => {
               await api.miSalud({ condiciones: salud.condiciones || null, alergias: salud.alergias || null })
+              onCambio()
               return 'Guardado.'
             })
           }}
         >
-          <h3 className="h3">Mi salud</h3>
-          <p className="field__hint">Solo tú y los coaches de tu sede lo ven. Les ayuda a cuidarte y a recomendarte qué comer.</p>
+          <h2 className="h3">Mi salud</h2>
+          <p className="field__hint">Solo tú y los coaches de tu sede lo ven. Les ayuda a cuidarte, y tus alergias se quitan de tu plan de comidas.</p>
           <div className="field">
             <label htmlFor={`${id}-c`}>Condiciones especiales</label>
             <textarea id={`${id}-c`} rows={3} placeholder="Lesiones, enfermedades, embarazo…" value={salud.condiciones} onChange={(e) => setSalud({ ...salud, condiciones: e.target.value })} />
@@ -272,27 +526,30 @@ function MiEntrenamiento() {
             <label htmlFor={`${id}-al`}>Alergias</label>
             <input id={`${id}-al`} placeholder="Ej. nuez, lactosa" value={salud.alergias} onChange={(e) => setSalud({ ...salud, alergias: e.target.value })} />
           </div>
-          {avisos('salud')}
-          <button className="btn btn--glass glass" disabled={busy === 'salud'}>Guardar</button>
+          {accSalud.avisos}
+          <button className="btn btn--glass glass" disabled={accSalud.busy}>Guardar</button>
         </form>
-      </div>
 
-      <div className="card glass form">
-        <h3 className="h3">Mi avance</h3>
-        <AvancePeso
-          ficha={f}
-          busy={busy === 'peso'}
-          onRegistrar={(kg) =>
-            run('peso', async () => {
-              await api.miPeso(kg)
-              await cargar()
-              return 'Peso registrado.'
-            })
-          }
-        />
-        {avisos('peso')}
+        <div className="card glass form">
+          <h2 className="h3">Mi avance</h2>
+          {ficha ? (
+            <AvancePeso
+              ficha={ficha}
+              busy={accPeso.busy}
+              onRegistrar={(kg) =>
+                accPeso.run(async () => {
+                  await api.miPeso(kg)
+                  onCambio()
+                  return 'Peso registrado.'
+                })
+              }
+            />
+          ) : (
+            <p className="field__hint">Cargando…</p>
+          )}
+          {accPeso.avisos}
+        </div>
       </div>
     </>
   )
 }
-
