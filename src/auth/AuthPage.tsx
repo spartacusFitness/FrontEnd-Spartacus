@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import Background from '../Background'
 import { distanceKm, sedes } from '../data'
@@ -13,9 +13,6 @@ import {
   recuperarContrasena,
   registrarDispositivo,
   registrarse,
-  salir,
-  subirFoto,
-  type Rol,
   type Yo,
 } from './api'
 import './auth.css'
@@ -27,14 +24,6 @@ type Locate =
   | { state: 'loading' }
   | { state: 'done'; coords: { lat: number; lng: number }; sede: number; km: number }
   | { state: 'error'; message: string }
-
-const ROL_LABEL: Record<Rol, string> = {
-  admin: 'Administrador',
-  encargado: 'Encargado de sede',
-  recepcion: 'Recepción',
-  coach: 'Coach',
-  socio: 'Socio',
-}
 
 const message = (err: unknown, fallback = 'Algo salió mal. Inténtalo de nuevo.') =>
   err instanceof ApiError ? err.message : fallback
@@ -239,18 +228,12 @@ export default function AuthPage({ mode }: { mode: Mode }) {
   const google = () =>
     run(() => entrarConGoogle(remember, `/login${location.search}`))
 
-  const cambiarFoto = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (file) run(async () => setCuenta(await subirFoto(file)))
-  }
-
-  // Si vino desde un panel (/login?next=/recepcion), regresa ahí en cuanto tenga cuenta con sede.
+  // En cuanto tiene cuenta lista (con sede, o es personal del gym) entra directo a su panel;
+  // si vino desde una página del panel (/login?next=/recepcion), regresa ahí.
   const next = params.get('next')
   useEffect(() => {
-    if (cuenta && (cuenta.sede || cuenta.roles.some((r) => r.rol !== 'socio')) && next?.startsWith('/') && !next.startsWith('//')) {
-      navigate(next, { replace: true })
-    }
+    if (!cuenta || !(cuenta.sede || cuenta.roles.some((r) => r.rol !== 'socio'))) return
+    navigate(next?.startsWith('/') && !next.startsWith('//') ? next : '/panel', { replace: true })
   }, [cuenta, next, navigate])
 
   const query = location.search
@@ -319,45 +302,9 @@ export default function AuthPage({ mode }: { mode: Mode }) {
     )
   } else if (cuenta) {
     card = (
-      <div className="auth__done">
-        <div className="perfil">
-          <label className="perfil__foto" htmlFor={`${id}-foto`} title="Cambiar foto">
-            {cuenta.fotoUrl ? (
-              <img src={cuenta.fotoUrl} alt="Tu foto de perfil" width={88} height={88} referrerPolicy="no-referrer" />
-            ) : (
-              <span aria-hidden="true">{(primerNombre ?? cuenta.email)[0].toUpperCase()}</span>
-            )}
-            <span className="perfil__cam">Cambiar</span>
-          </label>
-          <input id={`${id}-foto`} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={cambiarFoto} />
-          <div>
-            <h1 id={`${id}-title`} className="auth__title">{primerNombre ? `¡Hola, ${primerNombre}!` : '¡Hola!'}</h1>
-            <p className="field__hint">{cuenta.email}</p>
-          </div>
-        </div>
-        {cuenta.sede && (
-          <p className="auth__sede">Tu sede: <strong>{cuenta.sede.nombre}</strong></p>
-        )}
-        {cuenta.roles.length > 0 && (
-          <ul className="chips" aria-label="Tus roles">
-            {cuenta.roles.map((r) => (
-              <li key={`${r.rol}-${r.sedeId}`} className="chip glass">
-                {ROL_LABEL[r.rol]}{r.sedeId && r.rol !== 'socio' ? ` · ${sedes.find((s) => s.id === r.sedeId)?.name ?? r.sedeId}` : ''}
-              </li>
-            ))}
-          </ul>
-        )}
-        {info && <p className="auth__ok" role="status">{info}</p>}
-        {error && <p className="auth__error" role="alert">{error}</p>}
-        <p className="field__hint">
-          {getRemember() ? 'Sesión recordada en este dispositivo por 30 días.' : 'Tu sesión se cerrará al cerrar esta pestaña.'}
-        </p>
-        <div className="auth__done-actions">
-          <Link className="btn btn--red" to="/panel">Ir a mi panel</Link>
-          <button type="button" className="btn btn--glass glass" disabled={busy} onClick={() => run(async () => { await salir(); setCuenta(null) })}>
-            Cerrar sesión
-          </button>
-        </div>
+      <div className="auth__done" aria-live="polite">
+        <span className="auth__spinner" aria-hidden="true" />
+        <h1 id={`${id}-title`} className="auth__title">Entrando…</h1>
       </div>
     )
   } else if (verificar) {

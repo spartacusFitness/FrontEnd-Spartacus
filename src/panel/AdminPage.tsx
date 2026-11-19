@@ -363,7 +363,6 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
                 }))
               }}
             >
-              <option value="visita">Visita</option>
               <option value="semana">Semana</option>
               <option value="mes">Mes</option>
               <option value="especial">Especial (convenio, estudiante)</option>
