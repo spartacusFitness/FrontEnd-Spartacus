@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, type LinkProps } from 'react-router-dom'
+import { EN_MANTENIMIENTO } from './mantenimiento'
 import { appFeatures, base, faqs, sedes, type Sede } from './data'
 import { openStatus } from './status'
 import SedesMap, { type Focus } from './SedesMap'
@@ -13,6 +14,11 @@ const sections = [
   { href: '#app', label: 'App' },
   { href: '#preguntas', label: 'Preguntas' },
 ]
+
+/** Enlace a la app (login, registro, pagos). En mantenimiento no se muestra. */
+function AppLink(props: LinkProps) {
+  return EN_MANTENIMIENTO ? null : <Link {...props} />
+}
 
 /** Menú lateral para móvil y tableta. */
 function Drawer({ open, onClose, onSede, now }: { open: boolean; onClose: () => void; onSede: (i: number) => void; now: Date }) {
@@ -66,8 +72,8 @@ function Drawer({ open, onClose, onSede, now }: { open: boolean; onClose: () => 
           ))}
         </ul>
         <div className="drawer__actions">
-          <Link className="btn btn--red" to="/registro" onClick={onClose}>Crear cuenta</Link>
-          <Link className="btn btn--glass glass" to="/login" onClick={onClose}>Iniciar sesión</Link>
+          <AppLink className="btn btn--red" to="/registro" onClick={onClose}>Crear cuenta</AppLink>
+          <AppLink className="btn btn--glass glass" to="/login" onClick={onClose}>Iniciar sesión</AppLink>
         </div>
       </div>
     </dialog>
@@ -252,8 +258,8 @@ export default function Landing() {
           </ul>
         </nav>
         <div className="nav__end">
-          <Link className="nav__login" to="/login">Iniciar sesión</Link>
-          <Link className="btn btn--red btn--sm nav__cta" to="/registro">Crear cuenta</Link>
+          <AppLink className="nav__login" to="/login">Iniciar sesión</AppLink>
+          <AppLink className="btn btn--red btn--sm nav__cta" to="/registro">Crear cuenta</AppLink>
           <button
             type="button"
             className="burger glass"
@@ -269,6 +275,13 @@ export default function Landing() {
       <Drawer open={menu} onClose={() => setMenu(false)} onSede={goSede} now={now} />
 
       <main id="top">
+        {EN_MANTENIMIENTO && (
+          <div className="mantenimiento wrap" role="status">
+            <p className="mantenimiento__aviso glass glass--red">
+              <strong>Estamos dando mantenimiento a la app.</strong> Por ahora no puedes iniciar sesión ni pagar en línea. Los gimnasios siguen abiertos: paga en recepción en efectivo o con tarjeta.
+            </p>
+          </div>
+        )}
         {/* 1 · HERO — nombre + logo en círculo con sedes flotantes */}
         <section className="hero wrap" aria-labelledby="hero-title">
           <div className="hero__copy">
@@ -281,7 +294,7 @@ export default function Landing() {
             </p>
             <div className="hero__actions" data-reveal>
               <a className="btn btn--red" href="#mapa">Encuentra tu sede</a>
-              <Link className="btn btn--glass glass" to="/registro">Crea tu cuenta</Link>
+              <AppLink className="btn btn--glass glass" to="/registro">Crea tu cuenta</AppLink>
             </div>
           </div>
 
@@ -444,12 +457,12 @@ export default function Landing() {
                     <ul className="plan__lines">
                       {p.lines.map((l) => <li key={l}>{l}</li>)}
                     </ul>
-                    <Link
+                    <AppLink
                       className={`btn ${i === 2 ? 'btn--white' : 'btn--red'} plan__action`}
                       to={`/login?next=pagar&sede=${sede.id}&plan=${p.name.toLowerCase()}`}
                     >
                       Pagar en línea
-                    </Link>
+                    </AppLink>
                   </article>
                 ))}
               </div>
@@ -474,9 +487,10 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
+              {EN_MANTENIMIENTO && <p className="app__mant">La app está en mantenimiento. Vuelve pronto.</p>}
               <div className="app__stores">
-                <Link className="btn btn--white" to="/registro">Crear mi cuenta</Link>
-                <Link className="btn btn--glass glass" to="/login">Ya tengo cuenta</Link>
+                <AppLink className="btn btn--white" to="/registro">Crear mi cuenta</AppLink>
+                <AppLink className="btn btn--glass glass" to="/login">Ya tengo cuenta</AppLink>
               </div>
             </div>
 

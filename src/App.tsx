@@ -7,6 +7,7 @@ import AdminPage from './panel/AdminPage'
 import { PanelInicio } from './panel/PanelLayout'
 import RecepcionPage from './panel/RecepcionPage'
 import SocioPage from './panel/SocioPage'
+import { EN_MANTENIMIENTO } from './mantenimiento'
 
 /** Al cambiar de página, vuelve arriba (salvo enlaces a una sección con #). */
 function ScrollTop() {
@@ -21,6 +22,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollTop />
+      {EN_MANTENIMIENTO ? (
+        <Routes>
+          {/* Mantenimiento: la app no está disponible; cualquier ruta muestra la landing. */}
+          <Route path="*" element={<Landing />} />
+        </Routes>
+      ) : (
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
@@ -33,6 +40,7 @@ export default function App() {
         <Route path="/mi-membresia" element={<SocioPage />} />
         <Route path="*" element={<Landing />} />
       </Routes>
+      )}
     </BrowserRouter>
   )
 }
