@@ -176,6 +176,18 @@ export interface ItemVenta {
   cantidad: number
 }
 
+export interface Logro { clave: string; titulo: string; descripcion: string; obtenido: boolean; actual: number; meta: number }
+export interface RetoSocio { id: number; nombre: string; descripcion: string | null; meta: number; desde: string; hasta: string; premio: string | null; terminado: boolean; inscrito: boolean; dias: number; cumplido: boolean }
+export interface Comunidad {
+  logros: Logro[]
+  ranking: { mes: string; participantes: number; top: { lugar: number; nombre: string; dias: number; soyYo: boolean }[]; miLugar: { lugar: number; dias: number } | null; participo: boolean; nombrePublico: string }
+  retos: RetoSocio[]
+}
+export interface RetoAdmin { id: number; nombre: string; descripcion: string | null; meta: number; desde: string; hasta: string; premio: string | null; activo: boolean; inscritos: number; cumplieron: { nombre: string; dias: number }[] }
+export interface RetoInput { nombre: string; descripcion: string | null; meta: number; desde: string; hasta: string; premio: string | null }
+export interface Mensaje { id: number; texto: string; deCoach: boolean; autor?: string | null; fecha: string; leido?: boolean }
+export interface Conversacion { socioId: string; nombre: string; fotoUrl: string | null; ultimo: string; fecha: string; deCoach: boolean; sinLeer: number }
+
 export interface Catalogo {
   productos: { id: number; nombre: string; categoria: Categoria; icono: string; precio: number; disponible: boolean; destacado: boolean }[]
   promociones: Promocion[]
@@ -381,6 +393,19 @@ export const api = {
   miFisico: (data: { alturaCm?: number | null; objetivo?: Objetivo | null; sexo?: Sexo | null }) => authed<{ ok: true }>('PATCH', '/yo/fisico', data),
   miSalud: (data: { condiciones: string | null; alergias: string | null }) => authed<{ condiciones: string | null; alergias: string | null }>('PUT', '/yo/salud', data),
   miNutricion: () => authed<Nutricion>('GET', '/yo/nutricion'),
+  miComunidad: () => authed<Comunidad>('GET', '/yo/comunidad'),
+  miRanking: (participar: boolean) => authed<void>('PUT', '/yo/ranking', { participar }),
+  inscribirReto: (id: number) => authed<void>('POST', `/yo/retos/${id}`),
+  salirReto: (id: number) => authed<void>('DELETE', `/yo/retos/${id}`),
+  misMensajes: () => authed<Mensaje[]>('GET', '/yo/mensajes'),
+  misSinLeer: () => authed<{ n: number }>('GET', '/yo/mensajes/sin-leer'),
+  escribirCoach: (texto: string) => authed<Mensaje>('POST', '/yo/mensajes', { texto }),
+  bandejaCoach: (s: string) => authed<Conversacion[]>('GET', `/coach/${s}/mensajes`),
+  conversacionCoach: (s: string, perfilId: string) => authed<Mensaje[]>('GET', `/coach/${s}/socios/${perfilId}/mensajes`),
+  contestarSocio: (s: string, perfilId: string, texto: string) => authed<Mensaje>('POST', `/coach/${s}/socios/${perfilId}/mensajes`, { texto }),
+  retos: (s: string) => authed<RetoAdmin[]>('GET', `/sedes/${s}/retos`),
+  crearReto: (s: string, data: RetoInput) => authed<{ id: number }>('POST', `/sedes/${s}/retos`, data),
+  editarReto: (s: string, id: number, data: Partial<RetoInput> & { activo?: boolean }) => authed<void>('PATCH', `/sedes/${s}/retos/${id}`, data),
   miPeso: (pesoKg: number) => authed<{ id: number; fecha: string; pesoKg: number }>('POST', '/yo/mediciones', { pesoKg }),
 
   /* ---------- Coaches (admin / encargado) ---------- */

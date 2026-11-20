@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
+import { RetosAdmin } from './Comunidad'
 import { DashboardTab } from './DashboardTab'
 import { BotonesEdicion, ModalEdicion, Pestanas, hayCambios, useEspejo, useVerMas, BotonCrear } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
@@ -40,7 +41,7 @@ export default function AdminPage() {
   )
 }
 
-type Tab = 'dashboard' | 'sede' | 'planes' | 'productos' | 'promociones' | 'recepcion' | 'coaches' | 'bitacora'
+type Tab = 'dashboard' | 'sede' | 'planes' | 'productos' | 'promociones' | 'retos' | 'recepcion' | 'coaches' | 'bitacora'
 
 function Admin({ yo }: { yo: Yo }) {
   const [sedes, setSedes] = useState<Sede[]>([])
@@ -94,6 +95,7 @@ function Admin({ yo }: { yo: Yo }) {
           { id: 'planes', texto: 'Planes', icono: 'planes', principal: true },
           { id: 'productos', texto: 'Productos', icono: 'productos', principal: true },
           { id: 'promociones', texto: 'Promociones', icono: 'promociones', principal: true },
+          { id: 'retos', texto: 'Retos', icono: 'retos' },
           { id: 'recepcion', texto: 'Recepción', icono: 'recepcion' },
           { id: 'coaches', texto: 'Coaches', icono: 'coaches' },
           { id: 'bitacora', texto: 'Bitácora', icono: 'bitacora' },
@@ -103,6 +105,7 @@ function Admin({ yo }: { yo: Yo }) {
       {tab === 'dashboard' && sedes.length > 0 && <DashboardTab sedes={sedes} todas={permitidas === null} />}
       {sede && tab === 'productos' && <ProductosTab key={sede.id} sedeId={sede.id} />}
       {sede && tab === 'promociones' && <PromocionesTab key={sede.id} sedeId={sede.id} />}
+      {sede && tab === 'retos' && <RetosAdmin key={sede.id} sedeId={sede.id} />}
       {sede && tab === 'sede' && <SedeTab key={sede.id} sede={sede} onGuardada={recargar} esAdmin={permitidas === null} />}
       {sede && tab === 'planes' && <PlanesTab key={sede.id} sedeId={sede.id} />}
       {sede && tab === 'recepcion' && <RecepcionTab key={sede.id} sedeId={sede.id} />}
@@ -666,6 +669,8 @@ const ACCIONES: Record<string, string> = {
   'producto.crear': 'Agregó producto',
   'producto.editar': 'Editó producto',
   'producto.eliminar': 'Eliminó producto',
+  'reto.crear': 'Creó reto',
+  'reto.editar': 'Editó reto',
   'inventario.entrada': 'Entrada de mercancía',
   'inventario.ajuste': 'Ajuste de inventario',
   'promocion.crear': 'Creó promoción',

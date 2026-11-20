@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from
 import { ApiError, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, EQUIPOS, GRUPOS, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, objetivo } from './Entrenamiento'
 import { Pestanas, useEspejo, confirmarExito, avisar, useVerMas, BotonesEdicion, ModalEdicion, hayCambios, BotonCrear } from './Navegacion'
+import { MensajesCoach } from './Comunidad'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { api, type Ejercicio, type Equipo, type FichaEntrenamiento, type GrupoMuscular, type Maquina, type Objetivo, type Rutina, type RutinaInput, type Sede, type SocioCoach } from './api'
 
@@ -39,7 +40,7 @@ export default function CoachPage() {
   )
 }
 
-type Tab = 'socios' | 'catalogo'
+type Tab = 'socios' | 'mensajes' | 'catalogo'
 
 function Coach({ yo }: { yo: Yo }) {
   const permitidas = sedesDe(yo, 'admin', 'encargado', 'coach')
@@ -66,6 +67,15 @@ function Coach({ yo }: { yo: Yo }) {
   useEffect(cargarCatalogo, [cargarCatalogo])
 
   const esCoach = tiene(yo, 'coach')
+  // Mensajes de socios sin leer (solo los coaches los atienden); se revisa cada minuto.
+  const [sinLeer, setSinLeer] = useState(0)
+  useEffect(() => {
+    if (!esCoach || !sedeId) return
+    const ver = () => api.bandejaCoach(sedeId).then((x) => setSinLeer(x.reduce((n, c) => n + c.sinLeer, 0))).catch(() => {})
+    ver()
+    const t = setInterval(ver, 60_000)
+    return () => clearInterval(t)
+  }, [esCoach, sedeId, tab])
   return (
     <>
       <div className="panel-head">
@@ -88,10 +98,12 @@ function Coach({ yo }: { yo: Yo }) {
         onCambio={setTab}
         items={[
           { id: 'socios', texto: 'Socios', icono: 'socios', principal: true },
+          ...(esCoach ? [{ id: 'mensajes' as const, texto: 'Mensajes', icono: 'mensajes' as const, principal: true, aviso: sinLeer || undefined }] : []),
           { id: 'catalogo', texto: 'Máquinas y ejercicios', icono: 'coaches', principal: true },
         ]}
       />
       {sedeId && tab === 'socios' && <SociosTab key={sedeId} sedeId={sedeId} catalogo={catalogo.ejercicios} irACatalogo={() => setTab('catalogo')} onCatalogo={cargarCatalogo} />}
+      {sedeId && esCoach && tab === 'mensajes' && <MensajesCoach key={sedeId} sedeId={sedeId} onSinLeer={setSinLeer} />}
       {sedeId && tab === 'catalogo' && <CatalogoTab key={sedeId} sedeId={sedeId} catalogo={catalogo} onCambio={cargarCatalogo} />}
     </>
   )

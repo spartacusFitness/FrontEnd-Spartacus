@@ -764,3 +764,49 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
 /* Hoy toca: solo los músculos del día */
 .hoy-grupos { margin: 0; font-weight: 900; font-size: clamp(1.4rem, 4.5vw, 2rem); line-height: 1.1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--white); overflow-wrap: anywhere; }
 .hoy-toca small + small { display: block; }
+
+/* ---- Fase 5: comunidad, retos, chat y promo del día ---- */
+.retos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.reto { display: grid; gap: 8px; align-content: start; padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
+.reto.is-cumplido { border-color: rgba(61, 220, 96, 0.6); }
+.reto p { margin: 0; }
+.reto__head { display: grid; gap: 2px; }
+.reto__head small { color: var(--grey-l); }
+.progreso { position: relative; height: 28px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.progreso > span { position: absolute; inset: 0 auto 0 0; background: var(--red); border-radius: 999px; }
+.reto.is-cumplido .progreso > span { background: #1f9d4c; }
+.progreso small { position: relative; display: block; padding: 0 12px; line-height: 28px; font-weight: 800; font-size: 13px; }
+.ranking { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ranking li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); }
+.ranking li.is-yo { outline: 2px solid var(--red); }
+.ranking__lugar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); font-weight: 900; }
+.ranking li:nth-child(1) .ranking__lugar { background: #c9a227; color: #000; }
+.ranking__nombre { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.logros { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.logros li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); opacity: 0.6; }
+.logros li.is-ok { opacity: 1; background: rgba(225, 6, 0, 0.16); }
+.logros__icono { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
+.logros li.is-ok .logros__icono { background: #c9a227; color: #000; }
+.logros__texto { display: grid; min-width: 0; }
+.logros__texto small { color: var(--grey-l); }
+.chat { display: grid; gap: 10px; }
+.chat__aviso { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(255, 201, 60, 0.12); border: 1px solid rgba(255, 201, 60, 0.4); font-size: 14px; }
+.chat__lista { display: flex; flex-direction: column; gap: 8px; max-height: min(55dvh, 520px); overflow-y: auto; padding: 4px; }
+.chat__msg { max-width: 82%; padding: 10px 12px; border-radius: 16px 16px 16px 4px; background: rgba(255, 255, 255, 0.08); overflow-wrap: anywhere; }
+.chat__msg.is-mio { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: rgba(225, 6, 0, 0.35); }
+.chat__msg p { margin: 0; white-space: pre-wrap; }
+.chat__autor { display: block; font-weight: 800; color: var(--grey-l); }
+.chat__hora { display: block; margin-top: 4px; font-size: 12px; color: var(--grey-l); text-align: right; }
+.chat__form { display: flex; gap: 8px; align-items: end; }
+.chat__form textarea { flex: 1; min-width: 0; min-height: 48px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(0, 0, 0, 0.3); color: var(--white); font: 400 16px var(--font); resize: vertical; }
+.chat__form textarea:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.35); }
+.promo-dest { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 18px; align-items: center; }
+.promo-dest:not(:has(img)) { grid-template-columns: minmax(0, 1fr); }
+.promo-dest__img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; }
+.promo-dest__info { display: grid; gap: 8px; justify-items: start; }
+.promo-dest__info p { margin: 0; }
+@media (max-width: 700px) { .promo-dest { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) {
+  /* Comunidad en celular: ranking y logros a lo ancho (en 2 columnas se parten los nombres) */
+  .app-socio .grid-2:has(.ranking, .logros) { grid-template-columns: minmax(0, 1fr); }
+}

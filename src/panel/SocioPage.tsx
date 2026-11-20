@@ -4,8 +4,9 @@ import { ApiError, actualizarPerfil, subirFoto, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, hoyDia, objetivo } from './Entrenamiento'
 import { Icono } from './Icono'
 import { IconoNav, Pestanas, avisar, confirmarExito, type IconoUI, useVerMas, destacadosPrimero, BotonesEdicion, ModalEdicion, hayCambios } from './Navegacion'
+import { ChatSocio, ComunidadSocio } from './Comunidad'
 import { PanelLayout, tiene } from './PanelLayout'
-import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Nutricion, type Objetivo, type Plan, type Sexo } from './api'
+import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Nutricion, type Objetivo, type Plan, type Promocion, type Sexo } from './api'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 
@@ -25,7 +26,7 @@ export default function SocioPage() {
   )
 }
 
-type Tab = 'inicio' | 'rutina' | 'nutricion' | 'pagos' | 'tienda' | 'perfil'
+type Tab = 'inicio' | 'rutina' | 'nutricion' | 'pagos' | 'tienda' | 'comunidad' | 'coach' | 'perfil'
 
 /** Acción con su propio aviso (ok / error) y estado de carga. */
 function useAccion() {
@@ -84,6 +85,24 @@ function MiApp({ yo: yoInicial }: { yo: Yo }) {
 
   const nombreCorto = yo.apodo ?? yo.nombre?.split(' ')[0] ?? 'atleta'
   const promosHoy = catalogo?.promociones.length ?? 0
+  // Aviso de promociones: se apaga cuando entra a Tienda (se recuerda en este dispositivo por día y promos).
+  const firmaPromos = catalogo ? `${catalogo.hoy ?? ''}:${catalogo.promociones.map((p) => p.id).join(',')}` : ''
+  const [promosVistas, setPromosVistas] = useState(() => { try { return localStorage.getItem('promosVistas') ?? '' } catch { return '' } })
+  useEffect(() => {
+    if (tab !== 'tienda' || !firmaPromos) return
+    setPromosVistas(firmaPromos)
+    try { localStorage.setItem('promosVistas', firmaPromos) } catch { /* sin almacenamiento: el aviso vuelve a salir */ }
+  }, [tab, firmaPromos])
+  const promosNuevas = promosHoy > 0 && promosVistas !== firmaPromos ? promosHoy : 0
+  // Mensajes del coach sin leer (se revisa cada minuto y al cambiar de pestaña).
+  const [sinLeer, setSinLeer] = useState(0)
+  useEffect(() => {
+    if (!activa) return
+    const ver = () => api.misSinLeer().then((x) => setSinLeer(x.n)).catch(() => {})
+    ver()
+    const t = setInterval(ver, 60_000)
+    return () => clearInterval(t)
+  }, [activa, tab])
   // Sin membresía vigente todo se ve, pero bloqueado (salvo Pagos y los datos de su cuenta).
   const bloqueada = !!m && !m.vigente
   const icono = (normal: IconoUI): IconoUI => (bloqueada ? 'candado' : normal)
@@ -106,12 +125,18 @@ function MiApp({ yo: yoInicial }: { yo: Yo }) {
           { id: 'rutina', texto: 'Rutina', icono: icono('coaches'), principal: true },
           { id: 'nutricion', texto: 'Nutrición', icono: icono('nutricion'), principal: true },
           { id: 'pagos', texto: 'Pagos', icono: 'membresia', principal: true },
-          { id: 'tienda', texto: 'Tienda', icono: icono('venta'), aviso: promosHoy || undefined },
+          { id: 'tienda', texto: 'Tienda', icono: icono('venta'), aviso: promosNuevas || undefined },
+          { id: 'comunidad', texto: 'Comunidad', icono: icono('comunidad') },
+          { id: 'coach', texto: 'Mi coach', icono: icono('mensajes'), aviso: sinLeer || undefined },
           { id: 'perfil', texto: 'Perfil', icono: 'perfil' },
         ]}
       />
 
-      {tab === 'inicio' && <Inicio m={m} ficha={ficha} nutri={nutri} promosHoy={promosHoy} ir={setTab} bloqueada={bloqueada} />}
+      {tab === 'inicio' && <Inicio m={m} ficha={ficha} nutri={nutri} promosHoy={promosHoy} promo={catalogo?.promociones.find((p) => p.imagenUrl) ?? catalogo?.promociones[0] ?? null} ir={setTab} bloqueada={bloqueada} />}
+      {bloqueada && tab === 'comunidad' && <Bloqueado titulo="Comunidad" incluye={['Tus logros', 'Ranking del mes de tu sede (opcional)', 'Retos con premio']} ir={setTab} />}
+      {bloqueada && tab === 'coach' && <Bloqueado titulo="Mi coach" incluye={['Pregúntale a los coaches de tu sede']} ir={setTab} />}
+      {!bloqueada && tab === 'comunidad' && <ComunidadSocio />}
+      {!bloqueada && tab === 'coach' && <ChatSocio />}
       {bloqueada && tab === 'rutina' && <Bloqueado titulo="Mi rutina" incluye={['Tu rutina semanal hecha por tu coach', 'Ejercicios, series, repeticiones y descansos', 'Indicaciones de cada ejercicio']} ir={setTab} />}
       {bloqueada && tab === 'nutricion' && <Bloqueado titulo="Mi nutrición" incluye={['Calorías y macros según tu objetivo', 'Ideas de comidas sin tus alérgenos', 'Consejos para tu objetivo']} ir={setTab} />}
       {bloqueada && tab === 'tienda' && <Bloqueado titulo="Tienda" incluye={['Promociones del día', 'Productos disponibles en tu sede']} ir={setTab} />}
@@ -154,7 +179,7 @@ function Bloqueado({ titulo, incluye, ir, compacto = false }: { titulo: string; 
 
 /* ---------------- Inicio ---------------- */
 
-function Inicio({ m, ficha, nutri, promosHoy, ir, bloqueada }: { m: MiMembresia | null; ficha: FichaEntrenamiento | null; nutri: Nutricion | null; promosHoy: number; ir: (t: Tab) => void; bloqueada: boolean }) {
+function Inicio({ m, ficha, nutri, promosHoy, promo, ir, bloqueada }: { m: MiMembresia | null; ficha: FichaEntrenamiento | null; nutri: Nutricion | null; promosHoy: number; promo: Promocion | null; ir: (t: Tab) => void; bloqueada: boolean }) {
   const [verHoy, setVerHoy] = useState(false)
   const hoy = hoyDia()
   const rutina = ficha?.rutina
@@ -249,14 +274,24 @@ function Inicio({ m, ficha, nutri, promosHoy, ir, bloqueada }: { m: MiMembresia 
         </div>
         <div className="card glass form">
           <h2 className="h3">Comunidad</h2>
-          <p>Muy pronto: comparte tu racha y tus logros con la comunidad de Spartacus.</p>
-          {promosHoy > 0 && (
-            <button type="button" className="btn btn--red" onClick={() => ir('tienda')}>
-              {promosHoy === 1 ? 'Hay 1 promoción hoy' : `Hay ${promosHoy} promociones hoy`}
-            </button>
-          )}
+          <p>Tus logros, el ranking del mes de tu sede y retos con premio.</p>
+          <button type="button" className="btn btn--glass glass" onClick={() => ir('comunidad')}>Ver comunidad</button>
         </div>
       </div>
+
+      {/* Promo del día, debajo de las tarjetas principales */}
+      {promo && (
+        <article className="card glass glass--red promo-dest">
+          {promo.imagenUrl && <img className="promo-dest__img" src={promo.imagenUrl} alt={promo.nombre} loading="lazy" />}
+          <div className="promo-dest__info">
+            <span className="field__label">Promo de hoy</span>
+            <h2 className="h3">{promo.nombre}</h2>
+            <p>{promo.productos.map((x) => `${x.cantidad}× ${x.nombre}`).join(' + ')} · <strong>{pesos(promo.precio)}</strong></p>
+            {promo.descripcion && <p className="field__hint">{promo.descripcion}</p>}
+            <button type="button" className="btn btn--red" onClick={() => ir('tienda')}>{promosHoy > 1 ? `Ver las ${promosHoy} promos de hoy` : 'Ver en la tienda'}</button>
+          </div>
+        </article>
+      )}
       </>)}
     </>
   )

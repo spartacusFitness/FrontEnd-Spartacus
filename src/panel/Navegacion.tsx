@@ -29,6 +29,9 @@ const UI = {
   abajo: 'M6 9l6 6 6-6',
   cerrar: 'M6 6l12 12M18 6 6 18',
   candado: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
+  comunidad: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4',
+  mensajes: 'M4 5h16v11H9l-5 4z',
+  retos: 'M5 21V4M5 4h11l-2 4 2 4H5',
   derecha: 'M9 18l6-6-6-6',
 } as const
 
