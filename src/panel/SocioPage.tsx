@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, actualizarPerfil, subirFoto, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, hoyDia, objetivo } from './Entrenamiento'
 import { Icono } from './Icono'
-import { IconoNav, Pestanas, avisar, type IconoUI } from './Navegacion'
+import { IconoNav, Pestanas, avisar, confirmarExito, type IconoUI } from './Navegacion'
 import { PanelLayout, tiene } from './PanelLayout'
 import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Nutricion, type Objetivo, type Plan, type Sexo } from './api'
 
@@ -376,7 +376,7 @@ function PlanModal({ plan, yo, m, pendiente, onCerrar, onCambio }: { plan: Plan;
     setBusy(true)
     try {
       const s = await api.solicitar(plan.id, 'mostrador')
-      avisar('ok', `Listo. Preséntate en recepción de ${yo.sede!.nombre} antes del ${horaMx(s.venceEn)} para pagar ${pesos(plan.precio)} y activar tu ${plan.nombre}.`)
+      confirmarExito('Plan reservado', `Preséntate en recepción de ${yo.sede!.nombre} antes del ${horaMx(s.venceEn)}.`, `Paga ${pesos(plan.precio)} y tu ${plan.nombre} se activa en ese momento.`)
       onCambio()
       onCerrar()
     } catch (e) {

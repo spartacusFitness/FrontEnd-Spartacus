@@ -652,3 +652,13 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
   .app-socio .bloqueado__lista { font-size: 13px; }
   .app-socio .comida__lista { padding-left: 16px; font-size: 14px; }
 }
+
+/* Modal de éxito temporal */
+.exito { width: min(420px, calc(100% - 32px)); }
+.exito__cuerpo { justify-items: center; text-align: center; position: relative; overflow: hidden; }
+.exito__cuerpo p { margin: 0; color: var(--grey-l); }
+.exito__icono { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; font-size: 32px; font-weight: 900; background: rgba(61, 220, 96, 0.22); color: #c9ffd6; border: 2px solid rgba(61, 220, 96, 0.6); }
+.exito__barra { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: rgba(61, 220, 96, 0.8); transform-origin: left; animation: exito-tiempo 4s linear forwards; }
+@keyframes exito-tiempo { to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .exito__barra { animation: none; } }
+.cobro-hecho { display: grid; gap: 10px; }

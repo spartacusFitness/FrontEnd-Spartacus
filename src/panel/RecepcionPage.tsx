@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { InventarioTab, VentaTab } from './MostradorTienda'
-import { Pestanas, useEspejo } from './Navegacion'
+import { Pestanas, confirmarExito, useEspejo } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import {
   aCentavos,
@@ -39,7 +39,7 @@ function Recepcion({ yo }: { yo: Yo }) {
   const [estado, setEstado] = useState<EstadoRecepcion | null>(null)
   const [planes, setPlanes] = useState<Plan[]>([])
   const [tab, setTab] = useState<Tab>('socios')
-  const [seleccion, setSeleccion] = useState<{ perfilId: string; planId?: number; solicitudId?: number } | null>(null)
+  const [seleccion, setSeleccion] = useState<{ perfilId: string; planId?: number; solicitudId?: number; n?: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEspejo(null, error)
 
@@ -63,7 +63,7 @@ function Recepcion({ yo }: { yo: Yo }) {
   if (!sedeId) return <div className="card glass">No tienes una sede asignada.</div>
 
   const abrirFicha = (perfilId: string, planId?: number, solicitudId?: number) => {
-    setSeleccion({ perfilId, planId, solicitudId })
+    setSeleccion({ perfilId, planId, solicitudId, n: Date.now() })
     setTab('socios')
   }
 
@@ -148,6 +148,7 @@ function AbrirTurno({ sedeId, estado, onAbierto }: { sedeId: string; estado: Est
     setError(null)
     try {
       await api.abrirTurno(sedeId, rid, pin, aCentavos(fondo || '0'))
+      confirmarExito('Turno abierto', `Fondo inicial: ${pesos(aCentavos(fondo || '0'))}.`)
       onAbierto()
     } catch (err) {
       setError(msg(err))
@@ -192,8 +193,8 @@ function SociosTab({
 }: {
   sedeId: string
   planes: Plan[]
-  seleccion: { perfilId: string; planId?: number; solicitudId?: number } | null
-  onSeleccion: (s: { perfilId: string; planId?: number; solicitudId?: number } | null) => void
+  seleccion: { perfilId: string; planId?: number; solicitudId?: number; n?: number } | null
+  onSeleccion: (s: { perfilId: string; planId?: number; solicitudId?: number; n?: number } | null) => void
   onCambio: () => void
 }) {
   const id = useId()
@@ -239,7 +240,7 @@ function SociosTab({
       </div>
 
       {seleccion ? (
-        <FichaSocio key={seleccion.perfilId + (seleccion.solicitudId ?? '')} sedeId={sedeId} planes={planes} seleccion={seleccion} onCambio={cambio} />
+        <FichaSocio key={seleccion.perfilId + (seleccion.n ?? '')} sedeId={sedeId} planes={planes} seleccion={seleccion} onCambio={cambio} onSolicitudCompletada={() => onSeleccion({ ...seleccion, solicitudId: undefined })} />
       ) : (
         <div className="card glass"><p className="field__hint">Elige un socio para ver su membresía, registrar su entrada o cobrar.</p></div>
       )}
@@ -266,11 +267,13 @@ function FichaSocio({
   planes,
   seleccion,
   onCambio,
+  onSolicitudCompletada,
 }: {
   sedeId: string
   planes: Plan[]
-  seleccion: { perfilId: string; planId?: number; solicitudId?: number }
+  seleccion: { perfilId: string; planId?: number; solicitudId?: number; n?: number }
   onCambio: () => void
+  onSolicitudCompletada: () => void
 }) {
   const id = useId()
   const [f, setF] = useState<Ficha | null>(null)
@@ -282,6 +285,8 @@ function FichaSocio({
   const [error, setError] = useState<string | null>(null)
   useEspejo(null, error)
   const [banner, setBanner] = useState<{ texto: string; ok: boolean } | null>(null)
+  // Tras cobrar se oculta el formulario para no cobrar dos veces por error.
+  const [cobrado, setCobrado] = useState<string | null>(null)
 
   const cargar = useCallback(() => {
     api.ficha(sedeId, seleccion.perfilId).then(setF).catch((e) => setError(msg(e)))
@@ -327,11 +332,17 @@ function FichaSocio({
         type="button"
         className="btn btn--glass glass"
         disabled={busy}
-        onClick={() => run(async () => { const r = await api.entrada(sedeId, f.id); setBanner(RESULTADO[r.resultado]) })}
+        onClick={() => run(async () => { const r = await api.entrada(sedeId, f.id); if (r.resultado === 'permitida') confirmarExito('Entrada registrada', `${f.nombre ?? f.email} puede pasar.`); else setBanner(RESULTADO[r.resultado]) })}
       >
         Registrar entrada
       </button>
 
+      {cobrado ? (
+        <div className="cobro-hecho">
+          <p className="banner banner--ok" role="status">{cobrado}</p>
+          <button type="button" className="btn btn--glass glass" onClick={() => setCobrado(null)}>Hacer otro cobro</button>
+        </div>
+      ) : (<>
       <h3 className="h3" style={{ fontSize: 22, marginTop: 6 }}>{f.vigente ? 'Renovar' : 'Cobrar membresía'}</h3>
       {seleccion.solicitudId && <p className="tag tag--warn">Completando solicitud en línea #{seleccion.solicitudId}</p>}
       <div className="form-row">
@@ -372,12 +383,16 @@ function FichaSocio({
               ...(seleccion.solicitudId ? { solicitudId: seleccion.solicitudId } : {}),
               ...(plan?.requiereValidacion ? { credencialValidada: credencial } : {}),
             })
-            setBanner({ ok: true, texto: `Cobrado ${pesos(r.total)} (${metodo}). Vigente del ${fechaLarga(r.inicio)} al ${fechaLarga(r.fin)}.` })
+            const vig = `Vigente del ${fechaLarga(r.inicio)} al ${fechaLarga(r.fin)}.`
+            setCobrado(`Cobrado ${pesos(r.total)} (${metodo}). ${vig}`)
+            if (seleccion.solicitudId) onSolicitudCompletada()
+            confirmarExito('Cobro registrado', `${pesos(r.total)} en ${metodo} · ${plan?.nombre ?? ''}`, vig, ...(seleccion.solicitudId ? ['La solicitud en línea quedó completada.'] : []))
           })
         }
       >
         {busy ? 'Un momento…' : `Cobrar ${plan ? pesos(plan.precio) : ''}`}
       </button>
+      </>)}
 
       {f.asistencias.length > 0 && (
         <>
@@ -478,6 +493,7 @@ function AltaTab({ sedeId, onAlta }: { sedeId: string; onAlta: (perfilId: string
         ...(f.pesoKg ? { pesoKg: Number(f.pesoKg.replace(',', '.')) } : {}),
         ...(f.objetivo ? { objetivo: f.objetivo } : {}),
       })
+      confirmarExito('Socio registrado', `${f.nombre} ya está dado de alta.`, `Le enviamos un correo a ${f.email} para crear su contraseña.`, 'Ahora cóbrale su plan.')
       onAlta(r.id)
     } catch (err) {
       setError(msg(err))
@@ -552,6 +568,7 @@ function CorteTab({ sedeId, estado, onCerrado }: { sedeId: string; estado: Estad
     try {
       const r = await api.cerrarTurno(sedeId, pin, aCentavos(contado || '0'), notas || undefined)
       setHecho(r)
+      confirmarExito('Turno cerrado', r.diferencia === 0 ? 'La caja cuadra.' : `Diferencia: ${pesos(r.diferencia ?? 0)} (${(r.diferencia ?? 0) < 0 ? 'falta' : 'sobra'}).`)
       setTimeout(onCerrado, 2500)
     } catch (err) {
       setError(msg(err))

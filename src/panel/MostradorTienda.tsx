@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import { ApiError } from '../auth/api'
 import { Icono } from './Icono'
 import { api, pesos, type ItemVenta, type Producto, type Promocion } from './api'
-import { useEspejo } from './Navegacion'
+import { confirmarExito, useEspejo } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 
@@ -44,7 +44,7 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
     setError(null)
     try {
       const r = await api.vender(sedeId, carrito.map(({ tipo, id, cantidad }) => ({ tipo, id, cantidad })), metodo)
-      setOk(`Venta registrada: ${pesos(r.total)} (${metodo}).`)
+      confirmarExito('Venta registrada', `${pesos(r.total)} en ${metodo}.`)
       setCarrito([])
       cargar()
       onVenta()

@@ -208,3 +208,39 @@ export function Avisos() {
     </div>
   )
 }
+
+/* ---------- Confirmación grande y temporal tras un proceso (cobro, venta, alta, corte…) ---------- */
+interface Exito { titulo: string; lineas: string[] }
+let oyenteExito: ((e: Exito) => void) | null = null
+/** Muestra un modal de éxito que se cierra solo a los 4 s (o con Esc / clic / botón). */
+export const confirmarExito = (titulo: string, ...lineas: string[]) => oyenteExito?.({ titulo, lineas })
+
+export function ExitoModal() {
+  const [e, setE] = useState<Exito | null>(null)
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    oyenteExito = setE
+    return () => {
+      oyenteExito = null
+    }
+  }, [])
+  useEffect(() => {
+    if (!e) return
+    if (!ref.current?.open) ref.current?.showModal()
+    const t = setTimeout(() => ref.current?.close(), 4000)
+    return () => clearTimeout(t)
+  }, [e])
+  return (
+    <dialog ref={ref} className="modal glass exito" aria-labelledby="exito-titulo" onClose={() => setE(null)} onClick={() => ref.current?.close()}>
+      {e && (
+        <div className="modal__cuerpo exito__cuerpo">
+          <span className="exito__icono" aria-hidden="true">✓</span>
+          <h2 id="exito-titulo" className="h3">{e.titulo}</h2>
+          {e.lineas.map((l) => <p key={l}>{l}</p>)}
+          <button type="button" className="btn btn--red" autoFocus>Entendido</button>
+          <span className="exito__barra" aria-hidden="true" />
+        </div>
+      )}
+    </dialog>
+  )
+}
