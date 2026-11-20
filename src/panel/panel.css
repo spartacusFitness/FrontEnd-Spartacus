@@ -733,3 +733,30 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
 .zona-peligro p { margin: 4px 0 0; }
 .btn--peligro { background: transparent; color: #ff8a80; border: 1px solid rgba(255, 120, 110, 0.7); }
 .btn--peligro:hover, .btn--peligro:focus-visible { background: #c40500; color: #fff; }
+
+/* Crear algo nuevo: arriba en escritorio, flotante en celular */
+.lista-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.lista-head .h3 { margin: 0; }
+.crear { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.crear__mas { font-size: 22px; line-height: 1; font-weight: 900; }
+.crear--flotante { display: none; }
+@media (max-width: 900px) {
+  .crear--arriba { display: none; }
+  .crear--flotante {
+    display: inline-flex;
+    position: fixed;
+    z-index: 60;
+    right: 16px;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    min-height: 56px;
+    padding: 0 22px;
+    border-radius: 999px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  }
+}
+.iconos-sel { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+.iconos-sel label { overflow-wrap: normal; word-break: normal; hyphens: auto; font-size: 13px; }
+@media (max-width: 900px) {
+  /* deja ver la última fila debajo del botón flotante de crear */
+  body:has(.crear--flotante) .panel--con-barra { padding-bottom: 184px; }
+}

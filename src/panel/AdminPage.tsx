@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { DashboardTab } from './DashboardTab'
-import { BotonesEdicion, EnModal, ModalEdicion, Pestanas, hayCambios, useEspejo, useVerMas } from './Navegacion'
+import { BotonesEdicion, ModalEdicion, Pestanas, hayCambios, useEspejo, useVerMas, BotonCrear } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { ProductosTab, PromocionesTab } from './TiendaAdmin'
 import { aCentavos, api, fechaLarga, horaMx, pesos, type Coach, type DiaCerrado, type EntradaBitacora, type Plan, type Recepcionista, type Sede } from './api'
@@ -133,6 +133,8 @@ function SedeTab({ sede, onGuardada, esAdmin }: { sede: Sede; onGuardada: () => 
   const cerrar = () => { setF(orig); setAbierto(false) }
   const [dias, setDias] = useState<DiaCerrado[]>([])
   const [nuevo, setNuevo] = useState({ fecha: '', motivo: '' })
+  const [creandoDia, setCreandoDia] = useState(false)
+  const cerrarDia = () => { setNuevo({ fecha: '', motivo: '' }); setCreandoDia(false) }
   const cal = useAccion()
 
   const cargarDias = useCallback(() => {
@@ -234,16 +236,23 @@ function SedeTab({ sede, onGuardada, esAdmin }: { sede: Sede; onGuardada: () => 
       )}
 
       <div className="card glass form">
-        <h2 className="h3">Días cerrados</h2>
+        <div className="lista-head">
+          <h2 className="h3">Días cerrados</h2>
+          <BotonCrear texto="Día cerrado" onClick={() => setCreandoDia(true)} />
+        </div>
         <p className="field__hint">Festivos y cierres. Si una membresía vence en uno de estos días, se recorre al siguiente día abierto.</p>
+        {creandoDia && (
+        <ModalEdicion titulo="Nuevo día cerrado" onCerrar={cerrarDia}>
         <form
-          className="form-row"
+          className="form"
           onSubmit={(e) => {
             e.preventDefault()
             cal.run(async () => {
               await api.agregarDia(sede.id, nuevo.fecha, nuevo.motivo)
               setNuevo({ fecha: '', motivo: '' })
+              setCreandoDia(false)
               cargarDias()
+              return 'Día cerrado agregado.'
             })
           }}
         >
@@ -255,8 +264,10 @@ function SedeTab({ sede, onGuardada, esAdmin }: { sede: Sede; onGuardada: () => 
             <label htmlFor={`${id}-mo`}>Motivo</label>
             <input id={`${id}-mo`} required placeholder="Navidad" value={nuevo.motivo} onChange={(e) => setNuevo({ ...nuevo, motivo: e.target.value })} />
           </div>
-          <button className="btn btn--glass glass" disabled={cal.busy} style={{ alignSelf: 'end' }}>Agregar</button>
+          <BotonesEdicion cambios={hayCambios({ fecha: '', motivo: '' }, nuevo)} busy={cal.busy} onCancelar={cerrarDia} texto="Agregar día" />
         </form>
+        </ModalEdicion>
+        )}
         {cal.avisos}
         <div className="lista">
           {dias.length === 0 && <p className="field__hint">Sin días cerrados.</p>}
@@ -287,8 +298,10 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
   const [editando, setEditando] = useState<number | null>(null)
   const [f, setF] = useState(PLAN_VACIO)
   const [orig, setOrig] = useState(PLAN_VACIO)
+  const [creando, setCreando] = useState(false)
   const acc = useAccion()
-  const cancelar = () => { setEditando(null); setF(PLAN_VACIO) }
+  const cancelar = () => { setEditando(null); setCreando(false); setF(PLAN_VACIO) }
+  const nuevoPlan = () => { setEditando(null); setF(PLAN_VACIO); setOrig(PLAN_VACIO); setCreando(true) }
 
   const cargar = useCallback(() => {
     api.planes(sedeId, true).then(setPlanes).catch(() => {})
@@ -327,6 +340,7 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
       if (editando) await api.editarPlan(sedeId, editando, data)
       else await api.crearPlan(sedeId, data)
       setEditando(null)
+      setCreando(false)
       setF(PLAN_VACIO)
       cargar()
       return editando ? 'Plan actualizado.' : 'Plan creado.'
@@ -334,9 +348,12 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
   }
 
   return (
-    <div className="grid-2">
+    <div className="form">
       <div className="card glass">
-        <h2 className="h3">Planes de la sede</h2>
+        <div className="lista-head">
+          <h2 className="h3">Planes de la sede</h2>
+          <BotonCrear texto="Nuevo plan" onClick={nuevoPlan} />
+        </div>
         <div className="lista">
           {planes.length === 0 && <p className="field__hint">Aún no hay planes. Crea el primero.</p>}
           {planes.map((p) => (
@@ -364,9 +381,9 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
         </div>
       </div>
 
-      <EnModal si={!!editando} titulo={`Editar plan ${orig.nombre}`} onCerrar={cancelar}>
-      <form className={editando ? 'form' : 'card glass form'} onSubmit={submit}>
-        {!editando && <h2 className="h3">Nuevo plan</h2>}
+      {(creando || !!editando) && (
+      <ModalEdicion titulo={editando ? `Editar plan ${orig.nombre}` : 'Nuevo plan'} onCerrar={cancelar}>
+      <form className="form" onSubmit={submit}>
         <div className="field">
           <label htmlFor={`${id}-n`}>Nombre</label>
           <input id={`${id}-n`} required placeholder="Mensualidad, Convenio prepa…" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
@@ -410,15 +427,10 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
         <label className="check"><input type="checkbox" checked={f.requiereValidacion} onChange={(e) => setF({ ...f, requiereValidacion: e.target.checked })} /> Requiere revisar credencial o documento</label>
         <label className="check"><input type="checkbox" checked={f.renovableEnLinea} onChange={(e) => setF({ ...f, renovableEnLinea: e.target.checked })} /> Se puede renovar desde la app</label>
         {acc.avisos}
-        {editando ? (
-          <BotonesEdicion cambios={hayCambios(orig, f)} busy={acc.busy} onCancelar={cancelar} />
-        ) : (
-          <div className="auth__done-actions">
-            <button className="btn btn--red" disabled={acc.busy}>Crear plan</button>
-          </div>
-        )}
+        <BotonesEdicion cambios={hayCambios(orig, f)} busy={acc.busy} onCancelar={cancelar} texto={editando ? 'Guardar cambios' : 'Crear plan'} />
       </form>
-      </EnModal>
+      </ModalEdicion>
+      )}
     </div>
   )
 }
@@ -430,6 +442,8 @@ function RecepcionTab({ sedeId }: { sedeId: string }) {
   const [cuenta, setCuenta] = useState<{ usuario: string; contrasena: string } | null>(null)
   const [lista, setLista] = useState<Recepcionista[]>([])
   const [nuevo, setNuevo] = useState({ nombre: '', pin: '' })
+  const [creandoRec, setCreandoRec] = useState(false)
+  const cerrarRec = () => { setNuevo({ nombre: '', pin: '' }); setCreandoRec(false) }
   const [pinNuevo, setPinNuevo] = useState<Record<number, string>>({})
   const accCuenta = useAccion()
   const acc = useAccion()
@@ -471,14 +485,20 @@ function RecepcionTab({ sedeId }: { sedeId: string }) {
       </div>
 
       <div className="card glass form">
-        <h2 className="h3">Recepcionistas</h2>
+        <div className="lista-head">
+          <h2 className="h3">Recepcionistas</h2>
+          <BotonCrear texto="Recepcionista" onClick={() => setCreandoRec(true)} />
+        </div>
+        {creandoRec && (
+        <ModalEdicion titulo="Nuevo recepcionista" onCerrar={cerrarRec}>
         <form
-          className="form-row"
+          className="form"
           onSubmit={(e) => {
             e.preventDefault()
             acc.run(async () => {
               await api.crearRecepcionista(sedeId, nuevo.nombre, nuevo.pin)
               setNuevo({ nombre: '', pin: '' })
+              setCreandoRec(false)
               cargar()
               return 'Recepcionista agregado.'
             })
@@ -492,8 +512,10 @@ function RecepcionTab({ sedeId }: { sedeId: string }) {
             <label htmlFor={`${id}-p`}>PIN (4 a 6 números)</label>
             <input id={`${id}-p`} required inputMode="numeric" pattern="\d{4,6}" type="password" autoComplete="new-password" value={nuevo.pin} onChange={(e) => setNuevo({ ...nuevo, pin: e.target.value })} />
           </div>
-          <button className="btn btn--glass glass" disabled={acc.busy} style={{ alignSelf: 'end' }}>Agregar</button>
+          <BotonesEdicion cambios={hayCambios({ nombre: '', pin: '' }, nuevo)} busy={acc.busy} onCancelar={cerrarRec} texto="Agregar recepcionista" />
         </form>
+        </ModalEdicion>
+        )}
         {acc.avisos}
         <div className="lista">
           {lista.length === 0 && <p className="field__hint">Agrega a las personas que atienden recepción.</p>}
@@ -540,6 +562,8 @@ function CoachesTab({ sedeId }: { sedeId: string }) {
   const id = useId()
   const [lista, setLista] = useState<Coach[] | null>(null)
   const [nuevo, setNuevo] = useState({ nombre: '', email: '' })
+  const [creandoCoach, setCreandoCoach] = useState(false)
+  const cerrarCoach = () => { setNuevo({ nombre: '', email: '' }); setCreandoCoach(false) }
   const acc = useAccion()
   const cargar = useCallback(() => {
     api.coaches(sedeId).then(setLista).catch(() => setLista([]))
@@ -547,14 +571,17 @@ function CoachesTab({ sedeId }: { sedeId: string }) {
   useEffect(cargar, [cargar])
 
   return (
-    <div className="grid-2">
+    <div className="form">
+      {creandoCoach && (
+      <ModalEdicion titulo="Agregar coach" onCerrar={cerrarCoach}>
       <form
-        className="card glass form"
+        className="form"
         onSubmit={(e) => {
           e.preventDefault()
           acc.run(async () => {
             const r = await api.crearCoach(sedeId, nuevo.nombre, nuevo.email)
             setNuevo({ nombre: '', email: '' })
+            setCreandoCoach(false)
             cargar()
             return r.correoEnviado
               ? `Listo. Le enviamos a ${r.email} un correo para crear su contraseña.`
@@ -562,7 +589,6 @@ function CoachesTab({ sedeId }: { sedeId: string }) {
           })
         }}
       >
-        <h2 className="h3">Agregar coach</h2>
         <p>Recibe un correo para crear su contraseña. Si ya tiene cuenta (por ejemplo, también es socio), solo se le agrega el rol de coach. Un coach trabaja en una sola sede.</p>
         <div className="field">
           <label htmlFor={`${id}-n`}>Nombre</label>
@@ -573,11 +599,16 @@ function CoachesTab({ sedeId }: { sedeId: string }) {
           <input id={`${id}-e`} required type="email" autoComplete="off" value={nuevo.email} onChange={(e) => setNuevo({ ...nuevo, email: e.target.value })} />
         </div>
         {acc.avisos}
-        <button className="btn btn--red" disabled={acc.busy}>{acc.busy ? 'Agregando…' : 'Agregar coach'}</button>
+        <BotonesEdicion cambios={hayCambios({ nombre: '', email: '' }, nuevo)} busy={acc.busy} onCancelar={cerrarCoach} texto="Agregar coach" />
       </form>
+      </ModalEdicion>
+      )}
 
       <div className="card glass form">
-        <h2 className="h3">Coaches de la sede</h2>
+        <div className="lista-head">
+          <h2 className="h3">Coaches de la sede</h2>
+          <BotonCrear texto="Agregar coach" onClick={() => setCreandoCoach(true)} />
+        </div>
         <div className="lista">
           {lista === null && <p className="field__hint">Cargando…</p>}
           {lista?.length === 0 && <p className="field__hint">Todavía no hay coaches en esta sede.</p>}

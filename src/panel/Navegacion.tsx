@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 // Íconos de la interfaz (navegación y pestañas). Trazo de 2px, mismo lenguaje que los de productos.
 const UI = {
@@ -338,4 +339,24 @@ export function BotonesEdicion({ cambios, busy, onCancelar, texto = 'Guardar cam
 /** Envuelve en un modal de edición solo cuando `si`; si no, deja el contenido en su lugar. */
 export function EnModal({ si, titulo, onCerrar, children }: { si: boolean; titulo: string; onCerrar: () => void; children: ReactNode }) {
   return si ? <ModalEdicion titulo={titulo} onCerrar={onCerrar}>{children}</ModalEdicion> : <>{children}</>
+}
+
+/**
+ * Botón para crear algo nuevo: arriba de la lista en pantallas grandes; en celular flota a un lado
+ * (un solo flotante por pantalla: los demás pasan \`flotante={false}\`).
+ */
+export function BotonCrear({ texto, onClick, flotante = true }: { texto: string; onClick: () => void; flotante?: boolean }) {
+  const contenido = (
+    <>
+      <span className="crear__mas" aria-hidden="true">+</span>
+      <span>{texto}</span>
+    </>
+  )
+  return (
+    <>
+      <button type="button" className={`btn btn--red crear ${flotante ? 'crear--arriba' : ''}`} onClick={onClick}>{contenido}</button>
+      {/* En celular flota sobre la pantalla; va en <body> porque las tarjetas con vidrio (backdrop-filter) atrapan lo fijo. */}
+      {flotante && createPortal(<button type="button" className="btn btn--red crear crear--flotante" onClick={onClick}>{contenido}</button>, document.body)}
+    </>
+  )
 }

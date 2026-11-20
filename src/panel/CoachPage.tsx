@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, EQUIPOS, GRUPOS, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, objetivo } from './Entrenamiento'
-import { Pestanas, useEspejo, confirmarExito, avisar, useVerMas, BotonesEdicion, EnModal, ModalEdicion, hayCambios } from './Navegacion'
+import { Pestanas, useEspejo, confirmarExito, avisar, useVerMas, BotonesEdicion, ModalEdicion, hayCambios, BotonCrear } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { api, type Ejercicio, type Equipo, type FichaEntrenamiento, type GrupoMuscular, type Maquina, type Objetivo, type Rutina, type RutinaInput, type Sede, type SocioCoach } from './api'
 
@@ -720,7 +720,10 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
   const [maq, setMaq] = useState({ nombre: '', categoria: 'pecho' as GrupoMuscular })
   const [ej, setEj] = useState(EJ_VACIO)
   const [ejOrig, setEjOrig] = useState(EJ_VACIO)
-  const cancelarEj = () => { setEditando(null); setEj(EJ_VACIO) }
+  const [creando, setCreando] = useState(false)
+  const cancelarEj = () => { setEditando(null); setCreando(false); setEj(EJ_VACIO) }
+  const nuevoEj = () => { setEditando(null); setEj(EJ_VACIO); setEjOrig(EJ_VACIO); setCreando(true) }
+  const [creandoMaq, setCreandoMaq] = useState(false)
   const [editando, setEditando] = useState<number | null>(null)
   const [filtro, setFiltro] = useState<GrupoMuscular | ''>('')
   const accMaq = useAccion()
@@ -735,14 +738,20 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
   return (
     <div className="grid-2">
       <div className="card glass form">
-        <h2 className="h3">Máquinas de la sede</h2>
+        <div className="lista-head">
+          <h2 className="h3">Máquinas de la sede</h2>
+          <BotonCrear texto="Nueva máquina" flotante={false} onClick={() => setCreandoMaq(true)} />
+        </div>
+        {creandoMaq && (
+        <ModalEdicion titulo="Nueva máquina" onCerrar={() => { setMaq({ ...maq, nombre: '' }); setCreandoMaq(false) }}>
         <form
-          className="form-row"
+          className="form"
           onSubmit={(e) => {
             e.preventDefault()
             accMaq.run(async () => {
               await api.crearMaquina(sedeId, maq)
               setMaq({ ...maq, nombre: '' })
+              setCreandoMaq(false)
               onCambio()
               return 'Máquina agregada.'
             })
@@ -758,8 +767,10 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
               {GRUPOS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
           </div>
-          <button className="btn btn--glass glass" disabled={accMaq.busy} style={{ alignSelf: 'end' }}>Agregar</button>
+          <BotonesEdicion cambios={!!maq.nombre.trim()} busy={accMaq.busy} onCancelar={() => { setMaq({ ...maq, nombre: '' }); setCreandoMaq(false) }} texto="Agregar máquina" />
         </form>
+        </ModalEdicion>
+        )}
         {accMaq.avisos}
         {catalogo.maquinas.length > 6 && <input type="search" aria-label="Buscar máquina" placeholder="Buscar máquina…" value={qm} onChange={(e) => setQm(e.target.value)} />}
         <div className="lista">
@@ -780,8 +791,12 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
       </div>
 
       <div className="card glass form">
-        <h2 className="h3">Ejercicios</h2>
-        <EnModal si={!!editando} titulo={`Editar ${ejOrig.nombre}`} onCerrar={cancelarEj}>
+        <div className="lista-head">
+          <h2 className="h3">Ejercicios</h2>
+          <BotonCrear texto="Nuevo ejercicio" onClick={nuevoEj} />
+        </div>
+        {(creando || !!editando) && (
+      <ModalEdicion titulo={editando ? `Editar ${ejOrig.nombre}` : 'Nuevo ejercicio'} onCerrar={cancelarEj}>
         <form
           className="form"
           onSubmit={(e) => {
@@ -800,6 +815,7 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
               else await api.crearEjercicio(sedeId, data)
               setEj(EJ_VACIO)
               setEditando(null)
+              setCreando(false)
               onCambio()
               return editando ? 'Ejercicio actualizado.' : 'Ejercicio agregado.'
             })
@@ -849,15 +865,10 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
             <input id={`${id}-ei`} placeholder="Ej. espalda recta, codos pegados" value={ej.indicaciones} onChange={(e) => setEj({ ...ej, indicaciones: e.target.value })} />
           </div>
           {accEj.avisos}
-          {editando ? (
-            <BotonesEdicion cambios={hayCambios(ejOrig, ej)} busy={accEj.busy} onCancelar={cancelarEj} />
-          ) : (
-            <div className="fila__acc" style={{ justifyContent: 'flex-start' }}>
-              <button className="btn btn--red" disabled={accEj.busy}>Agregar ejercicio</button>
-            </div>
-          )}
+          <BotonesEdicion cambios={hayCambios(ejOrig, ej)} busy={accEj.busy} onCancelar={cancelarEj} texto={editando ? 'Guardar cambios' : 'Agregar ejercicio'} />
         </form>
-        </EnModal>
+        </ModalEdicion>
+      )}
 
         <label className="field">
           <span className="field__label">Ver</span>

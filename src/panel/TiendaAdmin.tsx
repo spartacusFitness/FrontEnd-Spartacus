@@ -3,7 +3,7 @@ import { ApiError } from '../auth/api'
 import { supabase } from '../lib/supabase'
 import { ICONOS, Icono } from './Icono'
 import { aCentavos, api, horaMx, pesos, type Categoria, type Movimiento, type Producto, type Promocion } from './api'
-import { useEspejo, useVerMas, destacadosPrimero, Estrella, BotonesEdicion, EnModal, hayCambios, ModalEdicion, confirmarExito } from './Navegacion'
+import { useEspejo, useVerMas, destacadosPrimero, Estrella, BotonesEdicion, hayCambios, ModalEdicion, confirmarExito, BotonCrear } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -31,7 +31,9 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
   const [f, setF] = useState(VACIO)
   const [editando, setEditando] = useState<Producto | null>(null)
   const [orig, setOrig] = useState(VACIO)
-  const cancelar = () => { setEditando(null); setF(VACIO) }
+  const [creando, setCreando] = useState(false)
+  const cancelar = () => { setEditando(null); setCreando(false); setF(VACIO) }
+  const nuevoProducto = () => { setSel(null); setEditando(null); setF(VACIO); setOrig(VACIO); setCreando(true) }
   const [sel, setSel] = useState<Producto | null>(null)
   const [movs, setMovs] = useState<Movimiento[]>([])
   const [mov, setMov] = useState({ tipo: 'entrada' as 'entrada' | 'ajuste', cantidad: '', motivo: '' })
@@ -74,6 +76,7 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
       else await api.crearProducto(sedeId, { ...base, stockInicial: f.esServicio ? 0 : Number(f.stockInicial) || 0, esServicio: f.esServicio })
       setF(VACIO)
       setEditando(null)
+      setCreando(false)
       return editando ? 'Producto actualizado.' : 'Producto agregado.'
     })
   }
@@ -96,9 +99,12 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
   }
 
   return (
-    <div className="grid-2">
+    <div className="form">
       <div className="card glass">
-        <h2 className="h3">Productos</h2>
+        <div className="lista-head">
+          <h2 className="h3">Productos</h2>
+          <BotonCrear texto="Nuevo producto" onClick={nuevoProducto} />
+        </div>
         <p className="field__hint">Fija con la estrella los que más se venden (Visita, Agua…): salen primero en Venta.</p>
         {lista.length > 6 && <input type="search" aria-label="Buscar producto" placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} />}
         <div className="lista">
@@ -212,9 +218,9 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
           </ModalEdicion>
         )}
 
-        <EnModal si={!!editando} titulo={`Editar ${editando?.nombre ?? ''}`} onCerrar={cancelar}>
-        <form className={editando ? 'form' : 'card glass form'} onSubmit={guardar}>
-          {!editando && <h2 className="h3">Nuevo producto</h2>}
+        {(creando || !!editando) && (
+      <ModalEdicion titulo={editando ? `Editar ${editando?.nombre ?? ''}` : 'Nuevo producto'} onCerrar={cancelar}>
+        <form className="form" onSubmit={guardar}>
           <div className="field">
             <label htmlFor={`${id}-n`}>Nombre</label>
             <input id={`${id}-n`} required value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
@@ -259,15 +265,10 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
             </div>
           </fieldset>
           <Avisos error={error} ok={ok} />
-          {editando ? (
-            <BotonesEdicion cambios={hayCambios(orig, f)} busy={busy} onCancelar={cancelar} />
-          ) : (
-            <div className="auth__done-actions">
-              <button className="btn btn--red" disabled={busy}>Agregar producto</button>
-            </div>
-          )}
+          <BotonesEdicion cambios={hayCambios(orig, f)} busy={busy} onCancelar={cancelar} texto={editando ? 'Guardar cambios' : 'Agregar producto'} />
         </form>
-        </EnModal>
+        </ModalEdicion>
+      )}
       </div>
     </div>
   )
@@ -284,8 +285,10 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
   const [f, setF] = useState(PVACIO)
   const [editando, setEditando] = useState<number | null>(null)
   const [orig, setOrig] = useState(PVACIO)
+  const [creando, setCreando] = useState(false)
+  const nuevaPromo = () => { setEditando(null); setF(PVACIO); setOrig(PVACIO); setImagen(null); setCreando(true) }
   const comparable = (x: typeof f) => ({ ...x, dias: [...x.dias].sort() })
-  const cancelar = () => { setEditando(null); setF(PVACIO); setImagen(null) }
+  const cancelar = () => { setEditando(null); setCreando(false); setF(PVACIO); setImagen(null) }
   const [imagen, setImagen] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -340,6 +343,7 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
       setF(PVACIO)
       setImagen(null)
       setEditando(null)
+      setCreando(false)
       return editando ? 'Promoción actualizada.' : 'Promoción creada.'
     })
   }
@@ -368,9 +372,12 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
   }
 
   return (
-    <div className="grid-2">
+    <div className="form">
       <div className="card glass">
-        <h2 className="h3">Promociones</h2>
+        <div className="lista-head">
+          <h2 className="h3">Promociones</h2>
+          <BotonCrear texto="Nueva promoción" onClick={nuevaPromo} />
+        </div>
         <div className="lista">
           {promos.length === 0 && <p className="field__hint">Crea una promo, por ejemplo "Lunes 2x1 en preentreno".</p>}
           {verPromos.map((p) => (
@@ -395,9 +402,9 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
         {masPromos}
       </div>
 
-      <EnModal si={!!editando} titulo={`Editar promoción ${orig.nombre}`} onCerrar={cancelar}>
-      <form className={editando ? 'form' : 'card glass form'} onSubmit={guardar}>
-        {!editando && <h2 className="h3">Nueva promoción</h2>}
+      {(creando || !!editando) && (
+      <ModalEdicion titulo={editando ? `Editar promoción ${orig.nombre}` : 'Nueva promoción'} onCerrar={cancelar}>
+      <form className="form" onSubmit={guardar}>
         <div className="field">
           <label htmlFor={`${id}-n`}>Nombre</label>
           <input id={`${id}-n`} required placeholder="Lunes 2x1 en preentreno" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
@@ -474,15 +481,10 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
           <input id={`${id}-img`} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setImagen(e.target.files?.[0] ?? null)} />
         </div>
         <Avisos error={error} ok={ok} />
-        {editando ? (
-          <BotonesEdicion cambios={!!imagen || hayCambios(comparable(orig), comparable(f))} busy={busy} onCancelar={cancelar} />
-        ) : (
-          <div className="auth__done-actions">
-            <button className="btn btn--red" disabled={busy}>{busy ? 'Guardando…' : 'Crear promoción'}</button>
-          </div>
-        )}
+        <BotonesEdicion cambios={!!imagen || hayCambios(comparable(orig), comparable(f))} busy={busy} onCancelar={cancelar} texto={editando ? 'Guardar cambios' : 'Crear promoción'} />
       </form>
-      </EnModal>
+      </ModalEdicion>
+      )}
     </div>
   )
 }
