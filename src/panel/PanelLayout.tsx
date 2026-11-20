@@ -267,6 +267,7 @@ export function PanelLayout({
 
   return (
     <NavPanelCtx.Provider value={ctx}>
+      <a className="saltar" href="#contenido">Saltar al contenido</a>
       <Background />
       <Avisos />
       <ExitoModal />
@@ -302,7 +303,7 @@ export function PanelLayout({
           </button>
         </div>
       </header>
-      <main className={`panel wrap ${yo ? 'panel--con-barra' : ''}`}>{contenido}</main>
+      <main id="contenido" tabIndex={-1} className={`panel wrap ${yo ? 'panel--con-barra' : ''}`}>{contenido}</main>
 
       {yo && (
         <>

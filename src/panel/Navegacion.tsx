@@ -294,12 +294,27 @@ export function ModalEdicion({ titulo, onCerrar, children }: { titulo: string; o
   useEffect(() => {
     if (!ref.current?.open) ref.current?.showModal()
   }, [])
+  // Si hay cambios sin guardar (BotonesEdicion marca data-sucio), se pide confirmación antes de cerrar.
+  const intentarCerrar = () => {
+    if (ref.current?.querySelector('[data-sucio="1"]') && !window.confirm('Tienes cambios sin guardar. ¿Descartarlos?')) return
+    ref.current?.close()
+  }
   return (
-    <dialog ref={ref} className="modal glass" aria-labelledby={tituloId} onClose={onCerrar} onClick={(e) => e.target === e.currentTarget && ref.current?.close()}>
+    <dialog
+      ref={ref}
+      className="modal glass"
+      aria-labelledby={tituloId}
+      onClose={onCerrar}
+      onCancel={(e) => {
+        e.preventDefault()
+        intentarCerrar()
+      }}
+      onClick={(e) => e.target === e.currentTarget && intentarCerrar()}
+    >
       <div className="modal__cuerpo">
         <div className="modal__head">
           <h2 id={tituloId} className="h3">{titulo}</h2>
-          <button type="button" className="aviso__cerrar" aria-label="Cerrar sin guardar" onClick={() => ref.current?.close()}>
+          <button type="button" className="aviso__cerrar" aria-label="Cerrar" onClick={intentarCerrar}>
             <IconoNav nombre="cerrar" size={20} />
           </button>
         </div>
@@ -312,9 +327,9 @@ export function ModalEdicion({ titulo, onCerrar, children }: { titulo: string; o
 /** Botones de guardar/cancelar: guardar solo se activa si hay cambios reales. */
 export function BotonesEdicion({ cambios, busy, onCancelar, texto = 'Guardar cambios' }: { cambios: boolean; busy: boolean; onCancelar: () => void; texto?: string }) {
   return (
-    <div className="edicion__botones">
+    <div className="edicion__botones" data-sucio={cambios ? '1' : '0'}>
       <button className="btn btn--red" disabled={busy || !cambios}>{busy ? 'Guardando…' : texto}</button>
-      <button type="button" className="btn btn--glass glass" onClick={onCancelar}>Cancelar</button>
+      <button type="button" className="btn btn--glass glass" onClick={() => (!cambios || window.confirm('Tienes cambios sin guardar. ¿Descartarlos?')) && onCancelar()}>Cancelar</button>
       <small className="field__hint" aria-live="polite">{cambios ? 'Tienes cambios sin guardar.' : 'Sin cambios todavía.'}</small>
     </div>
   )

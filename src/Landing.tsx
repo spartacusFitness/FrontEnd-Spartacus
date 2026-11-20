@@ -245,6 +245,7 @@ export default function Landing() {
     <>
       <Background />
 
+      <a className="saltar" href="#top">Saltar al contenido</a>
       <header className="nav glass">
         <a className="nav__mark" href="#top">
           <img src="/images/logos/casco-oscuro.png" alt="" width={34} height={27} />

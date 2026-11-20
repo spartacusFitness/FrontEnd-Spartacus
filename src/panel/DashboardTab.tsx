@@ -73,6 +73,7 @@ export function DashboardTab({ sedes, todas }: { sedes: Sede[]; todas: boolean }
 
   return (
     <div className="panel" style={{ padding: 0 }}>
+      <h2 className="visually-hidden">Indicadores y gráficas</h2>
       {/* Filtros: una fila, rango primero */}
       <div className="filtros">
         <div className="field">

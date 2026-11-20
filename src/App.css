@@ -1311,3 +1311,18 @@ main > section {
 .app__mant { font-weight: 800; font-size: 18px; }
 
 .plan__recepcion { display: grid; place-items: center; min-height: 48px; border-radius: 999px; border: 1px dashed rgba(255, 255, 255, 0.35); font-weight: 700; color: var(--grey-l); }
+
+/* ---- Auditoría UX: áreas táctiles en la landing ---- */
+.footer__links a { display: inline-flex; align-items: center; min-height: 44px; }
+.map__all { min-height: 44px; }
+.saltar { position: fixed; z-index: 3000; top: 8px; left: 8px; padding: 12px 18px; border-radius: 12px; background: #fff; color: #000; font-weight: 800; transform: translateY(-200%); }
+.saltar:focus { transform: none; }
+@media (max-width: 760px) {
+  .nav__mark { min-height: 44px; }
+  .btn, .btn--sm { min-height: 44px; }
+}
+@media (max-width: 760px) {
+  .footer__places a { min-height: 44px; display: flex; align-items: center; }
+  .footer__links a { min-width: 44px; }
+  .leaflet-container.leaflet-touch .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; }
+}

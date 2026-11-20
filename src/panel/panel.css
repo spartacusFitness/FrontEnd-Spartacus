@@ -687,3 +687,42 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
 .dato-lista div { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); min-width: 0; }
 .dato-lista dt { font-size: 12px; color: var(--grey-l); }
 .dato-lista dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+
+/* ---- Auditoría UX (ui-ux-pro-max) ---- */
+/* Buscadores y entradas sueltas con el mismo estilo que los campos (y 16px para que iOS no haga zoom). */
+.panel input[type='search'] {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--white);
+  font: 400 16px var(--font);
+}
+.panel input[type='search']:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.35); }
+.panel .fila__acc input { min-height: 44px; font-size: 16px; }
+/* Días de racha: texto de al menos 12px y "vino" con contraste suficiente para texto blanco. */
+.racha__dia { font-size: 12px; }
+.racha--compacta .racha__dia { width: 24px; height: 24px; font-size: 12px; }
+.racha__dia.is-vino { background: #c40500; border-color: #c40500; }
+/* Foco visible en botones con estilo reseteado. */
+.aviso__cerrar:focus-visible, .ptabs__flecha:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* Enlace para saltar al contenido (teclado). */
+.saltar { position: fixed; z-index: 3000; top: 8px; left: 8px; padding: 12px 18px; border-radius: 12px; background: #fff; color: #000; font-weight: 800; transform: translateY(-200%); }
+.saltar:focus { transform: none; }
+/* Celular: áreas táctiles de 44px como mínimo. */
+@media (max-width: 900px) {
+  .btn, .btn--sm { min-height: 44px; }
+  .check { min-height: 44px; }
+  .estrella { width: 44px; height: 44px; }
+  .app-socio .racha__dia { font-size: 12px; }
+}
+.panel:focus { outline: none; }
+@media (max-width: 900px) {
+  .dia { min-height: 44px; display: inline-flex; align-items: center; }
+}
+/* Perfil del socio en celular: las tarjetas con datos y gráficas van a lo ancho (en 2 columnas se parten las palabras). */
+@media (max-width: 900px) {
+  .app-socio .grid-2:has(.dato-lista) { grid-template-columns: minmax(0, 1fr); }
+}

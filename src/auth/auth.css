@@ -335,3 +335,7 @@ input:focus-visible + .perfil__foto, .perfil__foto:has(+ input:focus-visible) { 
   .auth__perks { justify-content: center; }
   .auth__orb { display: none; }
 }
+
+/* Auditoría UX: botón Mostrar contraseña con área táctil de 44px */
+.field__toggle { min-height: 44px; }
+.field__link { display: inline-flex; align-items: center; min-height: 44px; margin-block: -12px; }
