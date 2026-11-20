@@ -634,6 +634,7 @@ const ACCIONES: Record<string, string> = {
   'perfil.fisico': 'Actualizó objetivo/estatura',
   'producto.crear': 'Agregó producto',
   'producto.editar': 'Editó producto',
+  'producto.eliminar': 'Eliminó producto',
   'inventario.entrada': 'Entrada de mercancía',
   'inventario.ajuste': 'Ajuste de inventario',
   'promocion.crear': 'Creó promoción',

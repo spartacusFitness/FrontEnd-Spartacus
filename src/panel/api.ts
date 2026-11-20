@@ -319,7 +319,8 @@ export const api = {
   productos: (id: string, todos = false) => authed<Producto[]>('GET', `/sedes/${id}/productos${todos ? '?todos=1' : ''}`),
   crearProducto: (id: string, data: { nombre: string; categoria: Categoria; icono: string; precio: number; stockInicial: number; stockMinimo: number; esServicio?: boolean }) =>
     authed<Producto>('POST', `/sedes/${id}/productos`, data),
-  editarProducto: (id: string, pid: number, data: Partial<Pick<Producto, 'nombre' | 'categoria' | 'icono' | 'precio' | 'stockMinimo' | 'activo' | 'destacado'>>) =>
+  eliminarProducto: (id: string, pid: number) => authed<void>('DELETE', `/sedes/${id}/productos/${pid}`),
+  editarProducto: (id: string, pid: number, data: Partial<Pick<Producto, 'nombre' | 'categoria' | 'icono' | 'precio' | 'stockMinimo' | 'activo' | 'destacado' | 'esServicio'>>) =>
     authed<Producto>('PATCH', `/sedes/${id}/productos/${pid}`, data),
   inventario: (id: string, pid: number, mov: { tipo: 'entrada'; cantidad: number; motivo?: string } | { tipo: 'ajuste'; stockContado: number; motivo: string }) =>
     authed<{ stock: number }>('POST', `/sedes/${id}/productos/${pid}/inventario`, mov),

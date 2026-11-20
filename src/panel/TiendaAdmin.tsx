@@ -3,7 +3,7 @@ import { ApiError } from '../auth/api'
 import { supabase } from '../lib/supabase'
 import { ICONOS, Icono } from './Icono'
 import { aCentavos, api, horaMx, pesos, type Categoria, type Movimiento, type Producto, type Promocion } from './api'
-import { useEspejo, useVerMas, destacadosPrimero, Estrella, BotonesEdicion, EnModal, hayCambios } from './Navegacion'
+import { useEspejo, useVerMas, destacadosPrimero, Estrella, BotonesEdicion, EnModal, hayCambios, ModalEdicion, confirmarExito } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -46,6 +46,7 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
     api.productos(sedeId, true).then(setLista).catch(() => {})
   }, [sedeId])
   useEffect(cargar, [cargar])
+  useEffect(() => setSel((x) => (x ? (lista.find((p) => p.id === x.id) ?? null) : null)), [lista])
   useEffect(() => {
     if (sel) api.movimientos(sedeId, sel.id).then(setMovs).catch(() => setMovs([]))
   }, [sel, sedeId])
@@ -69,7 +70,7 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
     e.preventDefault()
     run(async () => {
       const base = { nombre: f.nombre, categoria: f.categoria, icono: f.icono, precio: aCentavos(f.precio), stockMinimo: Number(f.stockMinimo) || 0 }
-      if (editando) await api.editarProducto(sedeId, editando.id, base)
+      if (editando) await api.editarProducto(sedeId, editando.id, { ...base, esServicio: f.esServicio })
       else await api.crearProducto(sedeId, { ...base, stockInicial: f.esServicio ? 0 : Number(f.stockInicial) || 0, esServicio: f.esServicio })
       setF(VACIO)
       setEditando(null)
@@ -124,53 +125,91 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
 
       <div className="form">
         {sel && (
-          <div className="card glass form">
+          <ModalEdicion titulo={sel.nombre} onCerrar={() => setSel(null)}>
             <div className="socio-head">
               <span className="prod__icono"><Icono nombre={sel.icono} /></span>
-              <div className="fila__main">
-                <strong style={{ fontSize: 20 }}>{sel.nombre}</strong>
-                <small>{sel.esServicio ? 'Servicio: sin inventario' : `${sel.stock} en stock · mínimo ${sel.stockMinimo}`}</small>
-              </div>
+              <dl className="dato-lista" style={{ flex: 1 }}>
+                <div><dt>Precio</dt><dd>{pesos(sel.precio)}</dd></div>
+                <div><dt>Categoría</dt><dd>{CATEGORIAS.find(([c]) => c === sel.categoria)?.[1]}</dd></div>
+                <div><dt>Inventario</dt><dd>{sel.esServicio ? 'Ilimitado (servicio)' : `${sel.stock} en stock`}</dd></div>
+                {!sel.esServicio && <div><dt>Avisar con</dt><dd>{sel.stockMinimo} o menos</dd></div>}
+                <div><dt>Estado</dt><dd>{sel.activo ? 'Activo' : 'Desactivado'}{sel.destacado ? ' · Fijado ★' : ''}</dd></div>
+              </dl>
             </div>
-            {!sel.esServicio && <form className="form" onSubmit={registrar}>
-              <div className="dias" role="radiogroup" aria-label="Tipo de movimiento">
-                <label className="dia"><input type="radio" checked={mov.tipo === 'entrada'} onChange={() => setMov({ ...mov, tipo: 'entrada' })} />Llegó mercancía</label>
-                <label className="dia"><input type="radio" checked={mov.tipo === 'ajuste'} onChange={() => setMov({ ...mov, tipo: 'ajuste' })} />Ajuste por conteo</label>
-              </div>
-              <div className="form-row">
-                <div className="field">
-                  <label htmlFor={`${id}-c`}>{mov.tipo === 'entrada' ? 'Piezas que llegaron' : 'Piezas contadas en físico'}</label>
-                  <input id={`${id}-c`} type="number" min={mov.tipo === 'entrada' ? 1 : 0} required value={mov.cantidad} onChange={(e) => setMov({ ...mov, cantidad: e.target.value })} />
+            <div className="fila__acc" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn--red btn--sm" onClick={() => { const d = { nombre: sel.nombre, categoria: sel.categoria, icono: sel.icono, precio: String(sel.precio / 100), stockInicial: '0', stockMinimo: String(sel.stockMinimo), esServicio: sel.esServicio }; setSel(null); setEditando(sel); setF(d); setOrig(d) }}>Editar datos</button>
+              <button type="button" className="btn btn--glass btn--sm glass" disabled={busy} onClick={() => run(async () => { await api.editarProducto(sedeId, sel.id, { activo: !sel.activo }); return sel.activo ? `${sel.nombre} desactivado: ya no se vende.` : `${sel.nombre} activado.` })}>
+                {sel.activo ? 'Desactivar' : 'Activar'}
+              </button>
+              <button type="button" className="btn btn--glass btn--sm glass" disabled={busy} onClick={() => run(async () => { await api.editarProducto(sedeId, sel.id, { destacado: !sel.destacado }); return sel.destacado ? `${sel.nombre} ya no está fijado.` : `${sel.nombre} fijado: sale primero en Venta.` })}>
+                {sel.destacado ? 'Quitar estrella' : 'Fijar con estrella'}
+              </button>
+            </div>
+
+            {!sel.esServicio && (
+              <form className="form" onSubmit={registrar}>
+                <h3 className="h3">Inventario</h3>
+                <div className="dias" role="radiogroup" aria-label="Tipo de movimiento">
+                  <label className="dia"><input type="radio" checked={mov.tipo === 'entrada'} onChange={() => setMov({ ...mov, tipo: 'entrada' })} />Llegó mercancía</label>
+                  <label className="dia"><input type="radio" checked={mov.tipo === 'ajuste'} onChange={() => setMov({ ...mov, tipo: 'ajuste' })} />Ajuste por conteo</label>
                 </div>
-                <div className="field">
-                  <label htmlFor={`${id}-m`}>Motivo{mov.tipo === 'ajuste' ? '' : ' (opcional)'}</label>
-                  <input id={`${id}-m`} required={mov.tipo === 'ajuste'} placeholder={mov.tipo === 'ajuste' ? 'Merma, conteo mensual…' : 'Pedido a proveedor'} value={mov.motivo} onChange={(e) => setMov({ ...mov, motivo: e.target.value })} />
+                <div className="form-row">
+                  <div className="field">
+                    <label htmlFor={`${id}-c`}>{mov.tipo === 'entrada' ? 'Piezas que llegaron' : 'Piezas contadas en físico'}</label>
+                    <input id={`${id}-c`} type="number" min={mov.tipo === 'entrada' ? 1 : 0} required value={mov.cantidad} onChange={(e) => setMov({ ...mov, cantidad: e.target.value })} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${id}-m`}>Motivo{mov.tipo === 'ajuste' ? '' : ' (opcional)'}</label>
+                    <input id={`${id}-m`} required={mov.tipo === 'ajuste'} placeholder={mov.tipo === 'ajuste' ? 'Merma, conteo mensual…' : 'Pedido a proveedor'} value={mov.motivo} onChange={(e) => setMov({ ...mov, motivo: e.target.value })} />
+                  </div>
                 </div>
-              </div>
-              <div className="auth__done-actions">
-                <button className="btn btn--red btn--sm" disabled={busy}>Registrar</button>
-                <button type="button" className="btn btn--glass btn--sm glass" onClick={() => { const d = { nombre: sel.nombre, categoria: sel.categoria, icono: sel.icono, precio: String(sel.precio / 100), stockInicial: '0', stockMinimo: String(sel.stockMinimo), esServicio: sel.esServicio }; setEditando(sel); setF(d); setOrig(d) }}>Editar datos</button>
-                <button type="button" className="btn btn--glass btn--sm glass" onClick={() => run(async () => { await api.editarProducto(sedeId, sel.id, { activo: !sel.activo }); setSel({ ...sel, activo: !sel.activo }) })}>
-                  {sel.activo ? 'Desactivar' : 'Activar'}
-                </button>
-              </div>
-            </form>}
-            {movs.length > 0 && (
-              <table className="tabla">
-                <thead><tr><th>Fecha</th><th>Movimiento</th><th className="num">Cant.</th><th className="num">Quedó</th></tr></thead>
-                <tbody>
-                  {movs.slice(0, 8).map((m) => (
-                    <tr key={m.id}>
-                      <td>{horaMx(m.createdAt)}</td>
-                      <td>{m.tipo === 'venta' ? 'Venta' : m.tipo === 'entrada' ? 'Entrada' : `Ajuste${m.motivo ? `: ${m.motivo}` : ''}`}</td>
-                      <td className="num">{m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}</td>
-                      <td className="num">{m.stockResultante}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <p className="field__hint">{mov.tipo === 'entrada' ? `Se suman a las ${sel.stock} que hay.` : `Reemplaza las ${sel.stock} del sistema por lo que contaste.`}</p>
+                <div className="auth__done-actions">
+                  <button className="btn btn--red btn--sm" disabled={busy || !mov.cantidad}>{mov.tipo === 'entrada' ? 'Registrar entrada' : 'Registrar ajuste'}</button>
+                </div>
+              </form>
             )}
-          </div>
+            {movs.length > 0 && (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tabla">
+                  <thead><tr><th>Fecha</th><th>Movimiento</th><th className="num">Cant.</th><th className="num">Quedó</th></tr></thead>
+                  <tbody>
+                    {movs.slice(0, 8).map((m) => (
+                      <tr key={m.id}>
+                        <td>{horaMx(m.createdAt)}</td>
+                        <td>{m.tipo === 'venta' ? 'Venta' : m.tipo === 'entrada' ? 'Entrada' : `Ajuste${m.motivo ? `: ${m.motivo}` : ''}`}</td>
+                        <td className="num">{m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}</td>
+                        <td className="num">{m.stockResultante}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="zona-peligro">
+              <div>
+                <strong>Eliminar producto</strong>
+                <p className="field__hint">Se borra por completo junto con su historial de inventario. Las ventas ya hechas se conservan en los reportes. Si solo quieres dejar de venderlo, mejor desactívalo.</p>
+              </div>
+              <button
+                type="button"
+                className="btn btn--sm btn--peligro"
+                disabled={busy}
+                onClick={() => {
+                  if (!window.confirm(`¿Eliminar "${sel.nombre}" por completo? No se puede deshacer.`)) return
+                  const nombre = sel.nombre
+                  run(async () => {
+                    await api.eliminarProducto(sedeId, sel.id)
+                    setSel(null)
+                    confirmarExito('Producto eliminado', `"${nombre}" ya no existe en esta sede.`)
+                  })
+                }}
+              >
+                Eliminar
+              </button>
+            </div>
+          </ModalEdicion>
         )}
 
         <EnModal si={!!editando} titulo={`Editar ${editando?.nombre ?? ''}`} onCerrar={cancelar}>
@@ -203,18 +242,16 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
               <small id={`${id}-mi-h`} className="field__hint">piezas o menos</small>
             </div>}
           </div>
-          {!editando && (
-            <label className="check">
-              <input type="checkbox" checked={f.esServicio} onChange={(e) => setF({ ...f, esServicio: e.target.checked })} />
-              Es un servicio sin inventario (p. ej. Visita de un día)
-            </label>
-          )}
+          <label className="check">
+            <input type="checkbox" checked={f.esServicio} onChange={(e) => setF({ ...f, esServicio: e.target.checked })} />
+            Es un servicio ilimitado, sin inventario (p. ej. Visita de un día)
+          </label>
           <fieldset className="field" style={{ border: 0, padding: 0 }}>
             <legend className="field__label">Ícono</legend>
             <div className="iconos-sel">
               {ICONOS.map((ic) => (
                 <label key={ic.clave} className="icono-op">
-                  <input type="radio" name={`${id}-ic`} checked={f.icono === ic.clave} onChange={() => setF({ ...f, icono: ic.clave })} />
+                  <input type="radio" name={`${id}-ic`} checked={f.icono === ic.clave} onChange={() => setF({ ...f, icono: ic.clave, ...(ic.clave === 'visita' ? { esServicio: true } : {}) })} />
                   <Icono nombre={ic.clave} size={24} />
                   {ic.nombre}
                 </label>
