@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, actualizarPerfil, subirFoto, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, hoyDia, objetivo } from './Entrenamiento'
 import { Icono } from './Icono'
-import { IconoNav, Pestanas, avisar, confirmarExito, type IconoUI, useVerMas, destacadosPrimero } from './Navegacion'
+import { IconoNav, Pestanas, avisar, confirmarExito, type IconoUI, useVerMas, destacadosPrimero, BotonesEdicion, ModalEdicion, hayCambios } from './Navegacion'
 import { PanelLayout, tiene } from './PanelLayout'
 import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Nutricion, type Objetivo, type Plan, type Sexo } from './api'
 
@@ -486,6 +486,18 @@ function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: F
   const [datos, setDatos] = useState({ nombre: yo.nombre ?? '', apodo: yo.apodo ?? '', fechaNacimiento: yo.fechaNacimiento ?? '' })
   const [fisico, setFisico] = useState({ alturaCm: '', objetivo: '' as Objetivo | '', sexo: '' as Sexo | '' })
   const [salud, setSalud] = useState({ condiciones: '', alergias: '' })
+  // Edición en modal: "Guardar" solo se activa si algo cambió respecto a lo guardado.
+  const [modal, setModal] = useState<'datos' | 'fisico' | 'salud' | null>(null)
+  const origDatos = { nombre: yo.nombre ?? '', apodo: yo.apodo ?? '', fechaNacimiento: yo.fechaNacimiento ?? '' }
+  const origFisico = { alturaCm: ficha?.alturaCm ? String(ficha.alturaCm) : '', objetivo: (ficha?.objetivo ?? '') as Objetivo | '', sexo: (ficha?.sexo ?? '') as Sexo | '' }
+  const origSalud = { condiciones: ficha?.salud?.condiciones ?? '', alergias: ficha?.salud?.alergias ?? '' }
+  const cerrar = () => {
+    setDatos(origDatos)
+    setFisico(origFisico)
+    setSalud(origSalud)
+    setModal(null)
+  }
+  const OBJ_TXT = Object.fromEntries(OBJETIVOS.map(([k, l]) => [k, l])) as Record<string, string>
   const accFoto = useAccion()
   const accDatos = useAccion()
   const accFisico = useAccion()
@@ -520,6 +532,14 @@ function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: F
             </label>
           </div>
           {accFoto.avisos}
+          <dl className="dato-lista">
+            <div><dt>Nombre</dt><dd>{origDatos.nombre || 'Sin nombre'}</dd></div>
+            <div><dt>Apodo</dt><dd>{origDatos.apodo || '—'}</dd></div>
+            <div><dt>Nacimiento</dt><dd>{origDatos.fechaNacimiento ? new Date(`${origDatos.fechaNacimiento}T12:00:00Z`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : '—'}</dd></div>
+          </dl>
+          <button type="button" className="btn btn--glass glass" onClick={() => setModal('datos')}>Editar mis datos</button>
+          {modal === 'datos' && (
+          <ModalEdicion titulo="Mis datos" onCerrar={cerrar}>
           <form
             className="form"
             onSubmit={(e) => {
@@ -527,6 +547,7 @@ function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: F
               accDatos.run(async () => {
                 onYo(await actualizarPerfil({ nombre: datos.nombre, ...(datos.apodo ? { apodo: datos.apodo } : {}), ...(datos.fechaNacimiento ? { fechaNacimiento: datos.fechaNacimiento } : {}) }))
                 onCambio()
+                setModal(null)
                 return 'Datos guardados.'
               })
             }}
@@ -546,25 +567,39 @@ function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: F
               </div>
             </div>
             {accDatos.avisos}
-            <button className="btn btn--glass glass" disabled={accDatos.busy}>Guardar</button>
+            <BotonesEdicion cambios={hayCambios(origDatos, datos)} busy={accDatos.busy} onCancelar={cerrar} />
           </form>
+          </ModalEdicion>
+          )}
         </div>
 
         {bloqueada ? (
           <Bloqueado titulo="Mi objetivo" incluye={['Tu objetivo, estatura y sexo para tu plan']} ir={ir} />
         ) : (
+        <>
+        <div className="card glass form">
+          <h2 className="h3">Mi objetivo</h2>
+          <dl className="dato-lista">
+            <div><dt>Objetivo</dt><dd>{OBJ_TXT[origFisico.objetivo] ?? 'Sin elegir'}</dd></div>
+            <div><dt>Estatura</dt><dd>{origFisico.alturaCm ? `${origFisico.alturaCm} cm` : 'Sin registrar'}</dd></div>
+            <div><dt>Sexo</dt><dd>{origFisico.sexo === 'mujer' ? 'Mujer' : origFisico.sexo === 'hombre' ? 'Hombre' : 'Prefiero no decir'}</dd></div>
+          </dl>
+          <button type="button" className="btn btn--glass glass" onClick={() => setModal('fisico')}>Editar mi objetivo</button>
+        </div>
+        {modal === 'fisico' && (
+        <ModalEdicion titulo="Mi objetivo" onCerrar={cerrar}>
         <form
-          className="card glass form"
+          className="form"
           onSubmit={(e) => {
             e.preventDefault()
             accFisico.run(async () => {
               await api.miFisico({ alturaCm: fisico.alturaCm ? Number(fisico.alturaCm) : null, objetivo: fisico.objetivo || null, sexo: fisico.sexo || null })
               onCambio()
+              setModal(null)
               return 'Guardado. Tu coach ya lo ve y tu plan de nutrición se actualizó.'
             })
           }}
         >
-          <h2 className="h3">Mi objetivo</h2>
           <div className="field">
             <label htmlFor={`${id}-o`}>Objetivo</label>
             <select id={`${id}-o`} className="select" value={fisico.objetivo} onChange={(e) => setFisico({ ...fisico, objetivo: e.target.value as Objetivo | '' })}>
@@ -588,8 +623,11 @@ function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: F
           </div>
           <p className="field__hint">El sexo solo se usa para calcular tus calorías.</p>
           {accFisico.avisos}
-          <button className="btn btn--glass glass" disabled={accFisico.busy}>Guardar</button>
+          <BotonesEdicion cambios={hayCambios(origFisico, fisico)} busy={accFisico.busy} onCancelar={cerrar} />
         </form>
+        </ModalEdicion>
+        )}
+        </>
         )}
       </div>
 
@@ -597,18 +635,29 @@ function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: F
         <Bloqueado titulo="Mi salud y mi avance" incluye={['Condiciones y alergias que ve tu coach', 'Tu historial de peso con gráfica']} ir={ir} />
       ) : (
       <div className="grid-2">
+        <div className="card glass form">
+          <h2 className="h3">Mi salud</h2>
+          <p className="field__hint">Solo tú y los coaches de tu sede lo ven. Les ayuda a cuidarte, y tus alergias se quitan de tu plan de comidas.</p>
+          <dl className="dato-lista">
+            <div><dt>Condiciones especiales</dt><dd>{origSalud.condiciones || 'Ninguna'}</dd></div>
+            <div><dt>Alergias</dt><dd>{origSalud.alergias || 'Ninguna'}</dd></div>
+          </dl>
+          <button type="button" className="btn btn--glass glass" onClick={() => setModal('salud')}>Editar mi salud</button>
+        </div>
+        {modal === 'salud' && (
+        <ModalEdicion titulo="Mi salud" onCerrar={cerrar}>
         <form
-          className="card glass form"
+          className="form"
           onSubmit={(e) => {
             e.preventDefault()
             accSalud.run(async () => {
               await api.miSalud({ condiciones: salud.condiciones || null, alergias: salud.alergias || null })
               onCambio()
+              setModal(null)
               return 'Guardado.'
             })
           }}
         >
-          <h2 className="h3">Mi salud</h2>
           <p className="field__hint">Solo tú y los coaches de tu sede lo ven. Les ayuda a cuidarte, y tus alergias se quitan de tu plan de comidas.</p>
           <div className="field">
             <label htmlFor={`${id}-c`}>Condiciones especiales</label>
@@ -619,8 +668,10 @@ function Perfil({ yo, ficha, onYo, onCambio, bloqueada, ir }: { yo: Yo; ficha: F
             <input id={`${id}-al`} placeholder="Ej. nuez, lactosa" value={salud.alergias} onChange={(e) => setSalud({ ...salud, alergias: e.target.value })} />
           </div>
           {accSalud.avisos}
-          <button className="btn btn--glass glass" disabled={accSalud.busy}>Guardar</button>
+          <BotonesEdicion cambios={hayCambios(origSalud, salud)} busy={accSalud.busy} onCancelar={cerrar} />
         </form>
+        </ModalEdicion>
+        )}
 
         <div className="card glass form">
           <h2 className="h3">Mi avance</h2>

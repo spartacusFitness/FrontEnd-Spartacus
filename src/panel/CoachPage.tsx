@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, EQUIPOS, GRUPOS, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, objetivo } from './Entrenamiento'
-import { Pestanas, useEspejo, confirmarExito, avisar, useVerMas } from './Navegacion'
+import { Pestanas, useEspejo, confirmarExito, avisar, useVerMas, BotonesEdicion, EnModal, ModalEdicion, hayCambios } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { api, type Ejercicio, type Equipo, type FichaEntrenamiento, type GrupoMuscular, type Maquina, type Objetivo, type Rutina, type RutinaInput, type Sede, type SocioCoach } from './api'
 
@@ -157,6 +157,7 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCatalogo, onCam
   const [f, setF] = useState<FichaEntrenamiento | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
+  const [modal, setModal] = useState<'fisico' | 'salud' | null>(null)
   const [salud, setSalud] = useState({ condiciones: '', alergias: '' })
   const [fisico, setFisico] = useState({ alturaCm: '', objetivo: '' as Objetivo | '' })
   const accFisico = useAccion()
@@ -197,6 +198,14 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCatalogo, onCam
 
   if (error) return <div className="card glass panel-msg"><p className="auth__error" role="alert">{error}</p></div>
   if (!f) return <div className="card glass panel-msg" aria-live="polite"><span className="auth__spinner" aria-hidden="true" /> Cargando ficha…</div>
+  // Lo guardado, para activar "Guardar" solo con cambios reales.
+  const origFisico = { alturaCm: f.alturaCm ? String(f.alturaCm) : '', objetivo: (f.objetivo ?? '') as Objetivo | '' }
+  const origSalud = { condiciones: f.salud?.condiciones ?? '', alergias: f.salud?.alergias ?? '' }
+  const cerrarModal = () => {
+    setFisico(origFisico)
+    setSalud(origSalud)
+    setModal(null)
+  }
 
   return (
     <div className="ficha">
@@ -212,43 +221,70 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCatalogo, onCam
       </div>
 
       <div className="grid-2">
-        <form
-          className="card glass form"
-          onSubmit={(e) => {
-            e.preventDefault()
-            accFisico.run(async () => {
-              await api.fisicoCoach(sedeId, perfilId, { alturaCm: fisico.alturaCm ? Number(fisico.alturaCm) : null, objetivo: fisico.objetivo || null })
-              await cargar()
-              onCambio()
-              return 'Guardado.'
-            })
-          }}
-        >
+        <div className="card glass form">
           <h3 className="h3">Objetivo y estatura</h3>
-          <div className="field">
-            <label htmlFor={`${id}-obj`}>Objetivo</label>
-            <select id={`${id}-obj`} className="select" value={fisico.objetivo} onChange={(e) => setFisico({ ...fisico, objetivo: e.target.value as Objetivo | '' })}>
-              <option value="">Sin objetivo</option>
-              {OBJETIVOS.map(([k, l, d]) => <option key={k} value={k}>{l} — {d}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor={`${id}-alt`}>Estatura (cm)</label>
-            <input id={`${id}-alt`} inputMode="numeric" pattern="\d{2,3}" placeholder="Ej. 170" value={fisico.alturaCm} onChange={(e) => setFisico({ ...fisico, alturaCm: e.target.value })} />
-          </div>
-          {accFisico.avisos}
-          <button className="btn btn--glass glass" disabled={accFisico.busy}>Guardar</button>
-        </form>
+          <dl className="dato-lista">
+            <div><dt>Objetivo</dt><dd>{objetivo(f.objetivo)}</dd></div>
+            <div><dt>Estatura</dt><dd>{f.alturaCm ? `${f.alturaCm} cm` : 'Sin registrar'}</dd></div>
+          </dl>
+          <button type="button" className="btn btn--glass glass" onClick={() => setModal('fisico')}>Editar</button>
+        </div>
+        {modal === 'fisico' && (
+          <ModalEdicion titulo={`Objetivo y estatura de ${f.nombre ?? 'el socio'}`} onCerrar={cerrarModal}>
+            <form
+              className="form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                accFisico.run(async () => {
+                  await api.fisicoCoach(sedeId, perfilId, { alturaCm: fisico.alturaCm ? Number(fisico.alturaCm) : null, objetivo: fisico.objetivo || null })
+                  await cargar()
+                  setModal(null)
+                  onCambio()
+                  return 'Objetivo y estatura guardados.'
+                })
+              }}
+            >
+              <div className="field">
+                <label htmlFor={`${id}-obj`}>Objetivo</label>
+                <select id={`${id}-obj`} className="select" value={fisico.objetivo} onChange={(e) => setFisico({ ...fisico, objetivo: e.target.value as Objetivo | '' })}>
+                  <option value="">Sin objetivo</option>
+                  {OBJETIVOS.map(([k, l, d]) => <option key={k} value={k}>{l} — {d}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`${id}-alt`}>Estatura (cm)</label>
+                <input id={`${id}-alt`} inputMode="numeric" pattern="\d{2,3}" placeholder="Ej. 170" value={fisico.alturaCm} onChange={(e) => setFisico({ ...fisico, alturaCm: e.target.value })} />
+              </div>
+              <BotonesEdicion cambios={hayCambios(origFisico, fisico)} busy={accFisico.busy} onCancelar={cerrarModal} />
+            </form>
+          </ModalEdicion>
+        )}
 
         <div className="card glass form">
           <h3 className="h3">Salud</h3>
           {f.salud ? (
+            <>
+              <p className="field__hint">Privado: solo lo ven la persona y los coaches de la sede.</p>
+              <dl className="dato-lista">
+                <div><dt>Condiciones especiales</dt><dd>{f.salud.condiciones || 'Ninguna'}</dd></div>
+                <div><dt>Alergias</dt><dd>{f.salud.alergias || 'Ninguna'}</dd></div>
+              </dl>
+              <button type="button" className="btn btn--glass glass" onClick={() => setModal('salud')}>Editar salud</button>
+            </>
+          ) : (
+            <p>Los datos de salud solo los ven la persona y los coaches de la sede.</p>
+          )}
+        </div>
+        {modal === 'salud' && f.salud && (
+          <ModalEdicion titulo={`Salud de ${f.nombre ?? 'el socio'}`} onCerrar={cerrarModal}>
             <form
               className="form"
               onSubmit={(e) => {
                 e.preventDefault()
                 accSalud.run(async () => {
                   await api.saludCoach(sedeId, perfilId, { condiciones: salud.condiciones || null, alergias: salud.alergias || null })
+                  await cargar()
+                  setModal(null)
                   return 'Datos de salud guardados.'
                 })
               }}
@@ -262,13 +298,10 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCatalogo, onCam
                 <label htmlFor={`${id}-ale`}>Alergias</label>
                 <input id={`${id}-ale`} placeholder="Ej. nuez, lactosa" value={salud.alergias} onChange={(e) => setSalud({ ...salud, alergias: e.target.value })} />
               </div>
-              {accSalud.avisos}
-              <button className="btn btn--glass glass" disabled={accSalud.busy}>Guardar salud</button>
+              <BotonesEdicion cambios={hayCambios(origSalud, salud)} busy={accSalud.busy} onCancelar={cerrarModal} />
             </form>
-          ) : (
-            <p>Los datos de salud solo los ven la persona y los coaches de la sede.</p>
-          )}
-        </div>
+          </ModalEdicion>
+        )}
       </div>
 
       <div className="card glass form">
@@ -434,6 +467,7 @@ function RutinaEditor({
   irACatalogo: () => void
 }) {
   const [diasGen, setDiasGen] = useState('')
+  const esPropuesta = razones.length > 0
   const id = useId()
   const [nombre, setNombre] = useState(inicial?.nombre ?? '')
   const [notas, setNotas] = useState(inicial?.notas ?? '')
@@ -457,6 +491,10 @@ function RutinaEditor({
         ]),
       ),
   )
+  // Foto de lo que había al abrir el editor (sin las llaves internas) para saber si hubo cambios.
+  const foto = () => JSON.stringify({ nombre, notas, dias: [...dias.entries()].sort(([a], [b]) => a - b).map(([d, x]) => [d, x.categorias, x.notas, x.ejercicios.map((e) => [e.ejercicioId, e.series, e.repeticiones, e.descansoSeg, e.indicaciones])]) })
+  const [fotoInicial] = useState(foto)
+  const cambios = esPropuesta || !inicial || foto() !== fotoInicial
   const [error, setError] = useState<string | null>(null)
   const activos = useMemo(() => catalogo.filter((e) => e.activo), [catalogo])
   // Ejercicios recién escritos, mientras llega el catálogo actualizado.
@@ -666,7 +704,7 @@ function RutinaEditor({
 
       {error && <p className="auth__error" role="alert">{error}</p>}
       <div className="fila__acc" style={{ justifyContent: 'flex-start' }}>
-        <button type="button" className="btn btn--red" disabled={busy} onClick={guardar}>{busy ? 'Guardando…' : 'Aceptar y enviar al socio'}</button>
+        <button type="button" className="btn btn--red" disabled={busy || !cambios} title={cambios ? undefined : 'Sin cambios todavía'} onClick={guardar}>{busy ? 'Guardando…' : esPropuesta || !inicial ? 'Aceptar y enviar al socio' : 'Guardar cambios'}</button>
         <button type="button" className="btn btn--glass glass" onClick={onCancelar}>Cancelar</button>
       </div>
     </div>
@@ -681,6 +719,8 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
   const id = useId()
   const [maq, setMaq] = useState({ nombre: '', categoria: 'pecho' as GrupoMuscular })
   const [ej, setEj] = useState(EJ_VACIO)
+  const [ejOrig, setEjOrig] = useState(EJ_VACIO)
+  const cancelarEj = () => { setEditando(null); setEj(EJ_VACIO) }
   const [editando, setEditando] = useState<number | null>(null)
   const [filtro, setFiltro] = useState<GrupoMuscular | ''>('')
   const accMaq = useAccion()
@@ -740,7 +780,8 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
       </div>
 
       <div className="card glass form">
-        <h2 className="h3">{editando ? 'Editar ejercicio' : 'Ejercicios'}</h2>
+        <h2 className="h3">Ejercicios</h2>
+        <EnModal si={!!editando} titulo={`Editar ${ejOrig.nombre}`} onCerrar={cancelarEj}>
         <form
           className="form"
           onSubmit={(e) => {
@@ -808,11 +849,15 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
             <input id={`${id}-ei`} placeholder="Ej. espalda recta, codos pegados" value={ej.indicaciones} onChange={(e) => setEj({ ...ej, indicaciones: e.target.value })} />
           </div>
           {accEj.avisos}
-          <div className="fila__acc" style={{ justifyContent: 'flex-start' }}>
-            <button className="btn btn--red" disabled={accEj.busy}>{editando ? 'Guardar cambios' : 'Agregar ejercicio'}</button>
-            {editando && <button type="button" className="btn btn--glass glass" onClick={() => { setEditando(null); setEj(EJ_VACIO) }}>Cancelar</button>}
-          </div>
+          {editando ? (
+            <BotonesEdicion cambios={hayCambios(ejOrig, ej)} busy={accEj.busy} onCancelar={cancelarEj} />
+          ) : (
+            <div className="fila__acc" style={{ justifyContent: 'flex-start' }}>
+              <button className="btn btn--red" disabled={accEj.busy}>Agregar ejercicio</button>
+            </div>
+          )}
         </form>
+        </EnModal>
 
         <label className="field">
           <span className="field__label">Ver</span>
@@ -835,8 +880,10 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
                   type="button"
                   className="btn btn--glass btn--sm glass"
                   onClick={() => {
+                    const d = { nombre: e.nombre, categoria: e.categoria, equipo: e.equipo, maquinaId: e.maquinaId ? String(e.maquinaId) : '', series: String(e.series), repeticiones: e.repeticiones, indicaciones: e.indicaciones ?? '' }
                     setEditando(e.id)
-                    setEj({ nombre: e.nombre, categoria: e.categoria, equipo: e.equipo, maquinaId: e.maquinaId ? String(e.maquinaId) : '', series: String(e.series), repeticiones: e.repeticiones, indicaciones: e.indicaciones ?? '' })
+                    setEj(d)
+                    setEjOrig(d)
                   }}
                 >
                   Editar

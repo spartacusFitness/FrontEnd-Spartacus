@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { DashboardTab } from './DashboardTab'
-import { Pestanas, useEspejo, useVerMas } from './Navegacion'
+import { BotonesEdicion, EnModal, ModalEdicion, Pestanas, hayCambios, useEspejo, useVerMas } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { ProductosTab, PromocionesTab } from './TiendaAdmin'
 import { aCentavos, api, fechaLarga, horaMx, pesos, type Coach, type DiaCerrado, type EntradaBitacora, type Plan, type Recepcionista, type Sede } from './api'
@@ -126,6 +126,11 @@ function SedeTab({ sede, onGuardada, esAdmin }: { sede: Sede; onGuardada: () => 
     activa: sede.activa !== false,
   })
   const guardar = useAccion()
+  // Edición en modal: se compara contra lo guardado (los días como lista ordenada).
+  const [abierto, setAbierto] = useState(false)
+  const [orig, setOrig] = useState(f)
+  const comparable = (x: typeof f) => ({ ...x, dias: [...x.dias].sort() })
+  const cerrar = () => { setF(orig); setAbierto(false) }
   const [dias, setDias] = useState<DiaCerrado[]>([])
   const [nuevo, setNuevo] = useState({ fecha: '', motivo: '' })
   const cal = useAccion()
@@ -147,6 +152,8 @@ function SedeTab({ sede, onGuardada, esAdmin }: { sede: Sede; onGuardada: () => 
         diasSinServicio: [...f.dias],
         ...(esAdmin ? { activa: f.activa } : {}),
       })
+      setOrig(f)
+      setAbierto(false)
       onGuardada()
       return 'Sede guardada.'
     })
@@ -154,8 +161,23 @@ function SedeTab({ sede, onGuardada, esAdmin }: { sede: Sede; onGuardada: () => 
 
   return (
     <div className="grid-2">
-      <form className="card glass form" onSubmit={submit}>
-        <h2 className="h3">Datos de la sede</h2>
+      {!abierto && (
+        <div className="card glass form">
+          <h2 className="h3">Datos de la sede</h2>
+          <dl className="dato-lista">
+            <div><dt>Nombre</dt><dd>{orig.nombre}</dd></div>
+            <div><dt>Ciudad</dt><dd>{orig.ciudad}</dd></div>
+            <div><dt>Dirección</dt><dd>{orig.direccion}</dd></div>
+            <div><dt>Anti-passback</dt><dd>{orig.antipassbackMin} min</dd></div>
+            <div><dt>Sin servicio</dt><dd>{[...orig.dias].sort().map((i) => DIAS[i]).join(', ') || 'Abre todos los días'}</dd></div>
+            <div><dt>Estado</dt><dd>{orig.activa ? 'Activa' : 'Inactiva'}</dd></div>
+          </dl>
+          <button type="button" className="btn btn--red" onClick={() => setAbierto(true)}>Editar datos</button>
+        </div>
+      )}
+      {abierto && (
+      <ModalEdicion titulo={`Editar ${orig.nombre}`} onCerrar={cerrar}>
+      <form className="form" onSubmit={submit}>
         <div className="form-row">
           <div className="field">
             <label htmlFor={`${id}-n`}>Nombre</label>
@@ -206,8 +228,10 @@ function SedeTab({ sede, onGuardada, esAdmin }: { sede: Sede; onGuardada: () => 
           </label>
         )}
         {guardar.avisos}
-        <button className="btn btn--red" disabled={guardar.busy}>{guardar.busy ? 'Guardando…' : 'Guardar'}</button>
+        <BotonesEdicion cambios={hayCambios(comparable(orig), comparable(f))} busy={guardar.busy} onCancelar={cerrar} />
       </form>
+      </ModalEdicion>
+      )}
 
       <div className="card glass form">
         <h2 className="h3">Días cerrados</h2>
@@ -262,7 +286,9 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
   const [planes, setPlanes] = useState<Plan[]>([])
   const [editando, setEditando] = useState<number | null>(null)
   const [f, setF] = useState(PLAN_VACIO)
+  const [orig, setOrig] = useState(PLAN_VACIO)
   const acc = useAccion()
+  const cancelar = () => { setEditando(null); setF(PLAN_VACIO) }
 
   const cargar = useCallback(() => {
     api.planes(sedeId, true).then(setPlanes).catch(() => {})
@@ -270,8 +296,7 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
   useEffect(cargar, [cargar])
 
   const editar = (p: Plan) => {
-    setEditando(p.id)
-    setF({
+    const datos = {
       nombre: p.nombre,
       tipo: p.tipo,
       duracionDias: String(p.duracionDias),
@@ -280,7 +305,10 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
       pagoEnLinea: p.pagoEnLinea,
       requiereValidacion: p.requiereValidacion,
       renovableEnLinea: p.renovableEnLinea,
-    })
+    }
+    setEditando(p.id)
+    setF(datos)
+    setOrig(datos)
   }
 
   const submit = (e: FormEvent) => {
@@ -336,8 +364,9 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
         </div>
       </div>
 
-      <form className="card glass form" onSubmit={submit}>
-        <h2 className="h3">{editando ? 'Editar plan' : 'Nuevo plan'}</h2>
+      <EnModal si={!!editando} titulo={`Editar plan ${orig.nombre}`} onCerrar={cancelar}>
+      <form className={editando ? 'form' : 'card glass form'} onSubmit={submit}>
+        {!editando && <h2 className="h3">Nuevo plan</h2>}
         <div className="field">
           <label htmlFor={`${id}-n`}>Nombre</label>
           <input id={`${id}-n`} required placeholder="Mensualidad, Convenio prepa…" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
@@ -381,11 +410,15 @@ function PlanesTab({ sedeId }: { sedeId: string }) {
         <label className="check"><input type="checkbox" checked={f.requiereValidacion} onChange={(e) => setF({ ...f, requiereValidacion: e.target.checked })} /> Requiere revisar credencial o documento</label>
         <label className="check"><input type="checkbox" checked={f.renovableEnLinea} onChange={(e) => setF({ ...f, renovableEnLinea: e.target.checked })} /> Se puede renovar desde la app</label>
         {acc.avisos}
-        <div className="auth__done-actions">
-          <button className="btn btn--red" disabled={acc.busy}>{editando ? 'Guardar cambios' : 'Crear plan'}</button>
-          {editando && <button type="button" className="btn btn--glass glass" onClick={() => { setEditando(null); setF(PLAN_VACIO) }}>Cancelar</button>}
-        </div>
+        {editando ? (
+          <BotonesEdicion cambios={hayCambios(orig, f)} busy={acc.busy} onCancelar={cancelar} />
+        ) : (
+          <div className="auth__done-actions">
+            <button className="btn btn--red" disabled={acc.busy}>Crear plan</button>
+          </div>
+        )}
       </form>
+      </EnModal>
     </div>
   )
 }

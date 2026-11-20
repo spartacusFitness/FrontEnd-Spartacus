@@ -281,3 +281,46 @@ export function Estrella({ activa, nombre, onClick, disabled }: { activa: boolea
     </button>
   )
 }
+
+/* ---------- Edición en modal ---------- */
+
+/** ¿Cambió algo respecto a lo guardado? (compara valores, no referencias) */
+export const hayCambios = (antes: unknown, ahora: unknown) => JSON.stringify(antes) !== JSON.stringify(ahora)
+
+/** Modal para editar algo existente. Se abre al montarse; Esc, la X o el fondo lo cierran. */
+export function ModalEdicion({ titulo, onCerrar, children }: { titulo: string; onCerrar: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const tituloId = useRef(`edicion-${Math.random().toString(36).slice(2)}`).current
+  useEffect(() => {
+    if (!ref.current?.open) ref.current?.showModal()
+  }, [])
+  return (
+    <dialog ref={ref} className="modal glass" aria-labelledby={tituloId} onClose={onCerrar} onClick={(e) => e.target === e.currentTarget && ref.current?.close()}>
+      <div className="modal__cuerpo">
+        <div className="modal__head">
+          <h2 id={tituloId} className="h3">{titulo}</h2>
+          <button type="button" className="aviso__cerrar" aria-label="Cerrar sin guardar" onClick={() => ref.current?.close()}>
+            <IconoNav nombre="cerrar" size={20} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </dialog>
+  )
+}
+
+/** Botones de guardar/cancelar: guardar solo se activa si hay cambios reales. */
+export function BotonesEdicion({ cambios, busy, onCancelar, texto = 'Guardar cambios' }: { cambios: boolean; busy: boolean; onCancelar: () => void; texto?: string }) {
+  return (
+    <div className="edicion__botones">
+      <button className="btn btn--red" disabled={busy || !cambios}>{busy ? 'Guardando…' : texto}</button>
+      <button type="button" className="btn btn--glass glass" onClick={onCancelar}>Cancelar</button>
+      <small className="field__hint" aria-live="polite">{cambios ? 'Tienes cambios sin guardar.' : 'Sin cambios todavía.'}</small>
+    </div>
+  )
+}
+
+/** Envuelve en un modal de edición solo cuando `si`; si no, deja el contenido en su lugar. */
+export function EnModal({ si, titulo, onCerrar, children }: { si: boolean; titulo: string; onCerrar: () => void; children: ReactNode }) {
+  return si ? <ModalEdicion titulo={titulo} onCerrar={onCerrar}>{children}</ModalEdicion> : <>{children}</>
+}

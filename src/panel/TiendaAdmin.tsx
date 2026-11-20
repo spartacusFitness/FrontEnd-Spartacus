@@ -3,7 +3,7 @@ import { ApiError } from '../auth/api'
 import { supabase } from '../lib/supabase'
 import { ICONOS, Icono } from './Icono'
 import { aCentavos, api, horaMx, pesos, type Categoria, type Movimiento, type Producto, type Promocion } from './api'
-import { useEspejo, useVerMas, destacadosPrimero, Estrella } from './Navegacion'
+import { useEspejo, useVerMas, destacadosPrimero, Estrella, BotonesEdicion, EnModal, hayCambios } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -30,6 +30,8 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
   const [lista, setLista] = useState<Producto[]>([])
   const [f, setF] = useState(VACIO)
   const [editando, setEditando] = useState<Producto | null>(null)
+  const [orig, setOrig] = useState(VACIO)
+  const cancelar = () => { setEditando(null); setF(VACIO) }
   const [sel, setSel] = useState<Producto | null>(null)
   const [movs, setMovs] = useState<Movimiento[]>([])
   const [mov, setMov] = useState({ tipo: 'entrada' as 'entrada' | 'ajuste', cantidad: '', motivo: '' })
@@ -147,7 +149,7 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
               </div>
               <div className="auth__done-actions">
                 <button className="btn btn--red btn--sm" disabled={busy}>Registrar</button>
-                <button type="button" className="btn btn--glass btn--sm glass" onClick={() => { setEditando(sel); setF({ nombre: sel.nombre, categoria: sel.categoria, icono: sel.icono, precio: String(sel.precio / 100), stockInicial: '0', stockMinimo: String(sel.stockMinimo), esServicio: sel.esServicio }) }}>Editar datos</button>
+                <button type="button" className="btn btn--glass btn--sm glass" onClick={() => { const d = { nombre: sel.nombre, categoria: sel.categoria, icono: sel.icono, precio: String(sel.precio / 100), stockInicial: '0', stockMinimo: String(sel.stockMinimo), esServicio: sel.esServicio }; setEditando(sel); setF(d); setOrig(d) }}>Editar datos</button>
                 <button type="button" className="btn btn--glass btn--sm glass" onClick={() => run(async () => { await api.editarProducto(sedeId, sel.id, { activo: !sel.activo }); setSel({ ...sel, activo: !sel.activo }) })}>
                   {sel.activo ? 'Desactivar' : 'Activar'}
                 </button>
@@ -171,8 +173,9 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
           </div>
         )}
 
-        <form className="card glass form" onSubmit={guardar}>
-          <h2 className="h3">{editando ? `Editar ${editando.nombre}` : 'Nuevo producto'}</h2>
+        <EnModal si={!!editando} titulo={`Editar ${editando?.nombre ?? ''}`} onCerrar={cancelar}>
+        <form className={editando ? 'form' : 'card glass form'} onSubmit={guardar}>
+          {!editando && <h2 className="h3">Nuevo producto</h2>}
           <div className="field">
             <label htmlFor={`${id}-n`}>Nombre</label>
             <input id={`${id}-n`} required value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
@@ -219,11 +222,15 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
             </div>
           </fieldset>
           <Avisos error={error} ok={ok} />
-          <div className="auth__done-actions">
-            <button className="btn btn--red" disabled={busy}>{editando ? 'Guardar cambios' : 'Agregar producto'}</button>
-            {editando && <button type="button" className="btn btn--glass glass" onClick={() => { setEditando(null); setF(VACIO) }}>Cancelar</button>}
-          </div>
+          {editando ? (
+            <BotonesEdicion cambios={hayCambios(orig, f)} busy={busy} onCancelar={cancelar} />
+          ) : (
+            <div className="auth__done-actions">
+              <button className="btn btn--red" disabled={busy}>Agregar producto</button>
+            </div>
+          )}
         </form>
+        </EnModal>
       </div>
     </div>
   )
@@ -239,6 +246,9 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
   const [productos, setProductos] = useState<Producto[]>([])
   const [f, setF] = useState(PVACIO)
   const [editando, setEditando] = useState<number | null>(null)
+  const [orig, setOrig] = useState(PVACIO)
+  const comparable = (x: typeof f) => ({ ...x, dias: [...x.dias].sort() })
+  const cancelar = () => { setEditando(null); setF(PVACIO); setImagen(null) }
   const [imagen, setImagen] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -298,8 +308,7 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
   }
 
   const editar = (p: Promocion) => {
-    setEditando(p.id)
-    setF({
+    const d = {
       nombre: p.nombre,
       descripcion: p.descripcion ?? '',
       precio: String(p.precio / 100),
@@ -307,7 +316,11 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
       desde: p.desde ?? '',
       hasta: p.hasta ?? '',
       productos: p.productos.map((x) => ({ productoId: x.productoId, cantidad: x.cantidad })),
-    })
+    }
+    setEditando(p.id)
+    setF(d)
+    setOrig(d)
+    setImagen(null)
   }
 
   const [verPromos, masPromos] = useVerMas(promos, 8)
@@ -345,8 +358,9 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
         {masPromos}
       </div>
 
-      <form className="card glass form" onSubmit={guardar}>
-        <h2 className="h3">{editando ? 'Editar promoción' : 'Nueva promoción'}</h2>
+      <EnModal si={!!editando} titulo={`Editar promoción ${orig.nombre}`} onCerrar={cancelar}>
+      <form className={editando ? 'form' : 'card glass form'} onSubmit={guardar}>
+        {!editando && <h2 className="h3">Nueva promoción</h2>}
         <div className="field">
           <label htmlFor={`${id}-n`}>Nombre</label>
           <input id={`${id}-n`} required placeholder="Lunes 2x1 en preentreno" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
@@ -423,11 +437,15 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
           <input id={`${id}-img`} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setImagen(e.target.files?.[0] ?? null)} />
         </div>
         <Avisos error={error} ok={ok} />
-        <div className="auth__done-actions">
-          <button className="btn btn--red" disabled={busy}>{busy ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear promoción'}</button>
-          {editando && <button type="button" className="btn btn--glass glass" onClick={() => { setEditando(null); setF(PVACIO) }}>Cancelar</button>}
-        </div>
+        {editando ? (
+          <BotonesEdicion cambios={!!imagen || hayCambios(comparable(orig), comparable(f))} busy={busy} onCancelar={cancelar} />
+        ) : (
+          <div className="auth__done-actions">
+            <button className="btn btn--red" disabled={busy}>{busy ? 'Guardando…' : 'Crear promoción'}</button>
+          </div>
+        )}
       </form>
+      </EnModal>
     </div>
   )
 }

@@ -679,3 +679,11 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
 .estrella:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .estrella.is-on { color: #ffc93c; }
 .estrella-mini { color: #ffc93c; }
+
+/* Edición en modal */
+.edicion__botones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.edicion__botones .field__hint { flex-basis: 100%; margin: 0; }
+.dato-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
+.dato-lista div { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); min-width: 0; }
+.dato-lista dt { font-size: 12px; color: var(--grey-l); }
+.dato-lista dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
