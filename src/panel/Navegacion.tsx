@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 // Íconos de la interfaz (navegación y pestañas). Trazo de 2px, mismo lenguaje que los de productos.
 const UI = {
@@ -242,5 +242,42 @@ export function ExitoModal() {
         </div>
       )}
     </dialog>
+  )
+}
+
+/* ---------- Listas largas ---------- */
+
+/** Muestra las primeras `paso` filas y un botón "Ver más"; vuelve al inicio cuando cambia el filtro (`reinicio`). */
+export function useVerMas<T>(items: T[], paso = 10, reinicio: unknown = null): [T[], ReactNode] {
+  const [n, setN] = useState(paso)
+  const [antes, setAntes] = useState(reinicio)
+  if (antes !== reinicio) {
+    setAntes(reinicio)
+    setN(paso)
+  }
+  if (items.length <= paso) return [items, null]
+  const resto = items.length - n
+  return [
+    items.slice(0, n),
+    <div className="ver-mas">
+      <small>Mostrando {Math.min(n, items.length)} de {items.length}</small>
+      {resto > 0 ? (
+        <button type="button" className="btn btn--glass btn--sm glass" onClick={() => setN(n + paso * 2)}>Ver más ({resto})</button>
+      ) : (
+        <button type="button" className="btn btn--glass btn--sm glass" onClick={() => setN(paso)}>Ver menos</button>
+      )}
+    </div>,
+  ]
+}
+
+/** Fijados con estrella primero; el resto conserva su orden. */
+export const destacadosPrimero = <T extends { destacado?: boolean }>(xs: T[]) => [...xs.filter((x) => x.destacado), ...xs.filter((x) => !x.destacado)]
+
+/** Botón de estrella para fijar o quitar. */
+export function Estrella({ activa, nombre, onClick, disabled }: { activa: boolean; nombre: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className={`estrella ${activa ? 'is-on' : ''}`} aria-pressed={activa} aria-label={activa ? `Quitar ${nombre} de fijados` : `Fijar ${nombre}`} title={activa ? 'Fijado: siempre visible' : 'Fijar para que siempre se vea'} disabled={disabled} onClick={(e) => { e.stopPropagation(); onClick() }}>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1L3.2 9.4l6.1-.8z" fill={activa ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
+    </button>
   )
 }

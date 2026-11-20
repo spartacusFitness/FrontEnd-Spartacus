@@ -662,3 +662,20 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
 @keyframes exito-tiempo { to { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) { .exito__barra { animation: none; } }
 .cobro-hecho { display: grid; gap: 10px; }
+
+/* Generar rutina */
+.editor__generar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 14px; border-radius: 16px; background: rgba(225, 6, 0, 0.12); border: 1px solid rgba(225, 6, 0, 0.35); }
+.editor__generar .field { flex: 1 1 180px; }
+.editor__razones { padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.06); }
+.editor__razones ul { margin: 6px 0 0; padding-left: 18px; color: var(--grey-l); display: grid; gap: 4px; }
+.editor__cambiar { display: flex; align-items: end; gap: 8px; }
+.editor__cambiar .field { flex: 1; min-width: 0; }
+
+/* Listas largas y productos fijados */
+.ver-mas { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.ver-mas small { color: var(--grey-l); }
+.estrella { all: unset; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--grey-l); cursor: pointer; }
+.estrella:hover, .estrella:focus-visible { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.estrella:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.estrella.is-on { color: #ffc93c; }
+.estrella-mini { color: #ffc93c; }

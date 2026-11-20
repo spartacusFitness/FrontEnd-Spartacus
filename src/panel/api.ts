@@ -142,6 +142,8 @@ export interface Producto {
   stockMinimo: number
   /** servicio sin inventario (p. ej. Visita) */
   esServicio: boolean
+  /** fijado con estrella: siempre visible arriba */
+  destacado: boolean
   activo: boolean
 }
 
@@ -175,7 +177,7 @@ export interface ItemVenta {
 }
 
 export interface Catalogo {
-  productos: { id: number; nombre: string; categoria: Categoria; icono: string; precio: number; disponible: boolean }[]
+  productos: { id: number; nombre: string; categoria: Categoria; icono: string; precio: number; disponible: boolean; destacado: boolean }[]
   promociones: Promocion[]
   hoy: string | null
 }
@@ -317,7 +319,7 @@ export const api = {
   productos: (id: string, todos = false) => authed<Producto[]>('GET', `/sedes/${id}/productos${todos ? '?todos=1' : ''}`),
   crearProducto: (id: string, data: { nombre: string; categoria: Categoria; icono: string; precio: number; stockInicial: number; stockMinimo: number; esServicio?: boolean }) =>
     authed<Producto>('POST', `/sedes/${id}/productos`, data),
-  editarProducto: (id: string, pid: number, data: Partial<Pick<Producto, 'nombre' | 'categoria' | 'icono' | 'precio' | 'stockMinimo' | 'activo'>>) =>
+  editarProducto: (id: string, pid: number, data: Partial<Pick<Producto, 'nombre' | 'categoria' | 'icono' | 'precio' | 'stockMinimo' | 'activo' | 'destacado'>>) =>
     authed<Producto>('PATCH', `/sedes/${id}/productos/${pid}`, data),
   inventario: (id: string, pid: number, mov: { tipo: 'entrada'; cantidad: number; motivo?: string } | { tipo: 'ajuste'; stockContado: number; motivo: string }) =>
     authed<{ stock: number }>('POST', `/sedes/${id}/productos/${pid}/inventario`, mov),
@@ -391,6 +393,8 @@ export const api = {
   fisicoCoach: (s: string, perfilId: string, data: { alturaCm?: number | null; objetivo?: Objetivo | null }) => authed<{ ok: true }>('PATCH', `/coach/${s}/socios/${perfilId}`, data),
   saludCoach: (s: string, perfilId: string, data: { condiciones: string | null; alergias: string | null }) => authed<{ condiciones: string | null; alergias: string | null }>('PUT', `/coach/${s}/socios/${perfilId}/salud`, data),
   pesoCoach: (s: string, perfilId: string, pesoKg: number) => authed<{ id: number; fecha: string; pesoKg: number }>('POST', `/coach/${s}/socios/${perfilId}/mediciones`, { pesoKg }),
+  generarRutina: (s: string, perfilId: string, dias?: number) =>
+    authed<{ rutina: RutinaInput; razones: string[]; objetivo: Objetivo | null }>('POST', `/coach/${s}/socios/${perfilId}/rutina/generar`, dias ? { dias } : {}),
   guardarRutina: (s: string, perfilId: string, data: RutinaInput) => authed<Rutina>('PUT', `/coach/${s}/socios/${perfilId}/rutina`, data),
   quitarRutina: (s: string, perfilId: string) => authed<void>('DELETE', `/coach/${s}/socios/${perfilId}/rutina`),
   catalogoEntrenamiento: (s: string) => authed<{ maquinas: Maquina[]; ejercicios: Ejercicio[] }>('GET', `/coach/${s}/catalogo`),

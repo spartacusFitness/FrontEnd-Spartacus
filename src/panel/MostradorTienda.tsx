@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import { ApiError } from '../auth/api'
 import { Icono } from './Icono'
 import { api, pesos, type ItemVenta, type Producto, type Promocion } from './api'
-import { confirmarExito, useEspejo } from './Navegacion'
+import { confirmarExito, useEspejo, useVerMas, destacadosPrimero } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 
@@ -37,7 +37,9 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
   const cambiar = (i: number, d: number) => setCarrito((c) => c.flatMap((x, j) => (j !== i ? [x] : x.cantidad + d <= 0 ? [] : [{ ...x, cantidad: x.cantidad + d }])))
   const total = carrito.reduce((s, x) => s + x.precio * x.cantidad, 0)
   const enCarrito = (pid: number) => carrito.filter((x) => x.tipo === 'producto' && x.id === pid).reduce((s, x) => s + x.cantidad, 0)
-  const visibles = productos.filter((p) => !q || p.nombre.toLowerCase().includes(q.toLowerCase()))
+  // Fijados con estrella primero; el resto se ve con "Ver más" o buscando.
+  const filtrados = destacadosPrimero(productos.filter((p) => !q || p.nombre.toLowerCase().includes(q.toLowerCase())))
+  const [visibles, masVenta] = useVerMas(filtrados, Math.max(8, productos.filter((p) => p.destacado).length), q)
 
   const cobrar = async () => {
     setBusy(true)
@@ -78,7 +80,7 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
           <input id={`${id}-q`} type="search" placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div className="productos-grid">
-          {visibles.length === 0 && <p className="field__hint">No hay productos. El encargado los agrega en Administración → Productos.</p>}
+          {visibles.length === 0 && <p className="field__hint">{q ? 'Ningún producto con ese nombre.' : 'No hay productos. El encargado los agrega en Administración → Productos.'}</p>}
           {visibles.map((p) => {
             const agotado = !p.esServicio && p.stock - enCarrito(p.id) <= 0
             return (
@@ -90,13 +92,14 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
                 onClick={() => !agotado && agregar({ tipo: 'producto', id: p.id, nombre: p.nombre, precio: p.precio })}
               >
                 <span className="prod__icono"><Icono nombre={p.icono} /></span>
-                <strong>{p.nombre}</strong>
+                <strong>{p.destacado && <span className="estrella-mini" aria-label="Fijado">★ </span>}{p.nombre}</strong>
                 <small>{p.esServicio ? 'Servicio' : agotado ? 'Agotado' : `${p.stock - enCarrito(p.id)} disponibles`}</small>
                 <span>{pesos(p.precio)}</span>
               </button>
             )
           })}
         </div>
+        {masVenta}
       </div>
 
       <div className="card glass form" aria-live="polite">
@@ -143,6 +146,8 @@ export function VentaTab({ sedeId, onVenta }: { sedeId: string; onVenta: () => v
 export function InventarioTab({ sedeId }: { sedeId: string }) {
   const [productos, setProductos] = useState<Producto[]>([])
   const [cant, setCant] = useState<Record<number, string>>({})
+  const [qi, setQi] = useState('')
+  const [verInv, masInv] = useVerMas(destacadosPrimero(productos.filter((p) => !qi || p.nombre.toLowerCase().includes(qi.toLowerCase()))), 10, qi)
   const [error, setError] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   useEspejo(ok, error)
@@ -169,8 +174,9 @@ export function InventarioTab({ sedeId }: { sedeId: string }) {
     <div className="card glass form">
       <h2 className="h3">Inventario</h2>
       <p className="field__hint">Registra aquí la mercancía que llega. Los ajustes por conteo y los precios los hace el encargado.</p>
+      {productos.length > 6 && <input type="search" aria-label="Buscar producto" placeholder="Buscar producto…" value={qi} onChange={(e) => setQi(e.target.value)} />}
       <div className="lista">
-        {productos.map((p) => (
+        {verInv.map((p) => (
           <div key={p.id} className="fila">
             <span className="socio-head">
               <span className="prod__icono"><Icono nombre={p.icono} /></span>
@@ -195,6 +201,7 @@ export function InventarioTab({ sedeId }: { sedeId: string }) {
           </div>
         ))}
       </div>
+      {masInv}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { DashboardTab } from './DashboardTab'
-import { Pestanas, useEspejo } from './Navegacion'
+import { Pestanas, useEspejo, useVerMas } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { ProductosTab, PromocionesTab } from './TiendaAdmin'
 import { aCentavos, api, fechaLarga, horaMx, pesos, type Coach, type DiaCerrado, type EntradaBitacora, type Plan, type Recepcionista, type Sede } from './api'
@@ -619,6 +619,7 @@ const ACCIONES: Record<string, string> = {
 
 function BitacoraTab({ sedeId }: { sedeId: string }) {
   const [filas, setFilas] = useState<EntradaBitacora[] | null>(null)
+  const [verFilas, masFilas] = useVerMas(filas ?? [], 25)
   useEffect(() => {
     api.bitacora(sedeId).then(setFilas).catch(() => setFilas([]))
   }, [sedeId])
@@ -630,13 +631,13 @@ function BitacoraTab({ sedeId }: { sedeId: string }) {
       ) : filas.length === 0 ? (
         <p className="field__hint">Sin movimientos todavía.</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <><div style={{ overflowX: 'auto' }}>
           <table className="tabla">
             <thead>
               <tr><th>Fecha</th><th>Acción</th><th>Detalle</th></tr>
             </thead>
             <tbody>
-              {filas.map((b) => (
+              {verFilas.map((b) => (
                 <tr key={b.id}>
                   <td>{horaMx(b.createdAt)}</td>
                   <td>{ACCIONES[b.accion] ?? b.accion}</td>
@@ -646,6 +647,7 @@ function BitacoraTab({ sedeId }: { sedeId: string }) {
             </tbody>
           </table>
         </div>
+        {masFilas}</>
       )}
     </div>
   )

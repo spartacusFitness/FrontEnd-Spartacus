@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from 'react'
 import { ApiError } from '../auth/api'
 import { supabase } from '../lib/supabase'
 import { ICONOS, Icono } from './Icono'
 import { aCentavos, api, horaMx, pesos, type Categoria, type Movimiento, type Producto, type Promocion } from './api'
-import { useEspejo } from './Navegacion'
+import { useEspejo, useVerMas, destacadosPrimero, Estrella } from './Navegacion'
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal. Inténtalo de nuevo.')
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -36,6 +36,9 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  const [q, setQ] = useState('')
+  const filtrados = useMemo(() => destacadosPrimero(lista.filter((p) => !q || p.nombre.toLowerCase().includes(q.toLowerCase()))), [lista, q])
+  const [verProds, masProds] = useVerMas(filtrados, 10, q)
 
   const cargar = useCallback(() => {
     api.productos(sedeId, true).then(setLista).catch(() => {})
@@ -93,9 +96,12 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
     <div className="grid-2">
       <div className="card glass">
         <h2 className="h3">Productos</h2>
+        <p className="field__hint">Fija con la estrella los que más se venden (Visita, Agua…): salen primero en Venta.</p>
+        {lista.length > 6 && <input type="search" aria-label="Buscar producto" placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} />}
         <div className="lista">
           {lista.length === 0 && <p className="field__hint">Agrega tu primer producto.</p>}
-          {lista.map((p) => (
+          {lista.length > 0 && filtrados.length === 0 && <p className="field__hint">Ningún producto con ese nombre.</p>}
+          {verProds.map((p) => (
             <button key={p.id} type="button" className={`fila ${sel?.id === p.id ? 'is-active' : ''} ${p.activo ? '' : 'fila--off'}`} onClick={() => setSel(p)}>
               <span className="socio-head">
                 <span className="prod__icono"><Icono nombre={p.icono} /></span>
@@ -104,10 +110,14 @@ export function ProductosTab({ sedeId }: { sedeId: string }) {
                   <small>{CATEGORIAS.find(([c]) => c === p.categoria)?.[1]}{p.activo ? '' : ' · desactivado'}</small>
                 </span>
               </span>
-              {p.esServicio ? <span className="tag">Servicio</span> : <span className={`tag ${p.stock === 0 ? 'tag--bad' : p.stock <= p.stockMinimo ? 'tag--warn' : 'tag--ok'}`}>{p.stock} en stock</span>}
+              <span className="fila__acc">
+                {p.esServicio ? <span className="tag">Servicio</span> : <span className={`tag ${p.stock === 0 ? 'tag--bad' : p.stock <= p.stockMinimo ? 'tag--warn' : 'tag--ok'}`}>{p.stock} en stock</span>}
+                <Estrella activa={p.destacado} nombre={p.nombre} disabled={busy} onClick={() => run(async () => { await api.editarProducto(sedeId, p.id, { destacado: !p.destacado }); return p.destacado ? `${p.nombre} ya no está fijado.` : `${p.nombre} fijado: sale primero en Venta.` })} />
+              </span>
             </button>
           ))}
         </div>
+        {masProds}
       </div>
 
       <div className="form">
@@ -300,6 +310,7 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
     })
   }
 
+  const [verPromos, masPromos] = useVerMas(promos, 8)
   const valorNormal = f.productos.reduce((s, x) => s + (productos.find((p) => p.id === x.productoId)?.precio ?? 0) * x.cantidad, 0)
   const cuando = (p: Promocion) => {
     const d = p.diasSemana.split(',').filter(Boolean).map((n) => DIAS[Number(n)])
@@ -312,7 +323,7 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
         <h2 className="h3">Promociones</h2>
         <div className="lista">
           {promos.length === 0 && <p className="field__hint">Crea una promo, por ejemplo "Lunes 2x1 en preentreno".</p>}
-          {promos.map((p) => (
+          {verPromos.map((p) => (
             <div key={p.id} className={`fila ${p.activa ? '' : 'fila--off'}`}>
               <span className="socio-head">
                 {p.imagenUrl ? <img src={p.imagenUrl} alt="" width={64} height={36} style={{ borderRadius: 8, objectFit: 'cover' }} /> : <span className="prod__icono"><Icono nombre={p.productos[0]?.icono ?? 'otro'} /></span>}
@@ -331,6 +342,7 @@ export function PromocionesTab({ sedeId }: { sedeId: string }) {
             </div>
           ))}
         </div>
+        {masPromos}
       </div>
 
       <form className="card glass form" onSubmit={guardar}>

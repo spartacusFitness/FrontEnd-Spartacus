@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, EQUIPOS, GRUPOS, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, objetivo } from './Entrenamiento'
-import { Pestanas, useEspejo } from './Navegacion'
+import { Pestanas, useEspejo, confirmarExito, avisar, useVerMas } from './Navegacion'
 import { PanelLayout, sedesDe, tiene } from './PanelLayout'
 import { api, type Ejercicio, type Equipo, type FichaEntrenamiento, type GrupoMuscular, type Maquina, type Objetivo, type Rutina, type RutinaInput, type Sede, type SocioCoach } from './api'
 
@@ -91,7 +91,7 @@ function Coach({ yo }: { yo: Yo }) {
           { id: 'catalogo', texto: 'Máquinas y ejercicios', icono: 'coaches', principal: true },
         ]}
       />
-      {sedeId && tab === 'socios' && <SociosTab key={sedeId} sedeId={sedeId} catalogo={catalogo.ejercicios} irACatalogo={() => setTab('catalogo')} />}
+      {sedeId && tab === 'socios' && <SociosTab key={sedeId} sedeId={sedeId} catalogo={catalogo.ejercicios} irACatalogo={() => setTab('catalogo')} onCatalogo={cargarCatalogo} />}
       {sedeId && tab === 'catalogo' && <CatalogoTab key={sedeId} sedeId={sedeId} catalogo={catalogo} onCambio={cargarCatalogo} />}
     </>
   )
@@ -99,7 +99,7 @@ function Coach({ yo }: { yo: Yo }) {
 
 /* ================= Socios ================= */
 
-function SociosTab({ sedeId, catalogo, irACatalogo }: { sedeId: string; catalogo: Ejercicio[]; irACatalogo: () => void }) {
+function SociosTab({ sedeId, catalogo, irACatalogo, onCatalogo }: { sedeId: string; catalogo: Ejercicio[]; irACatalogo: () => void; onCatalogo: () => void }) {
   const [q, setQ] = useState('')
   const [lista, setLista] = useState<SocioCoach[] | null>(null)
   const [sel, setSel] = useState<string | null>(null)
@@ -111,6 +111,7 @@ function SociosTab({ sedeId, catalogo, irACatalogo }: { sedeId: string; catalogo
   }, [sedeId, q, version])
 
   const sinRutina = lista?.filter((s) => !s.tieneRutina).length ?? 0
+  const [verSocios, masSocios] = useVerMas(lista ?? [], 12, q)
   return (
     <div className="coach">
       <div className="card glass coach__lista">
@@ -122,7 +123,7 @@ function SociosTab({ sedeId, catalogo, irACatalogo }: { sedeId: string; catalogo
         <div className="lista">
           {lista === null && <p className="field__hint">Cargando…</p>}
           {lista?.length === 0 && <p className="field__hint">{q ? 'Nadie con ese nombre.' : 'Todavía no hay socios en esta sede.'}</p>}
-          {lista?.map((s) => (
+          {verSocios.map((s) => (
             <button key={s.id} type="button" className={`fila socio-fila ${sel === s.id ? 'is-active' : ''}`} onClick={() => setSel(s.id)} aria-pressed={sel === s.id}>
               <span className="avatar">{s.fotoUrl ? <img src={s.fotoUrl} alt="" referrerPolicy="no-referrer" /> : iniciales(s.nombre)}</span>
               <span className="fila__main">
@@ -135,10 +136,11 @@ function SociosTab({ sedeId, catalogo, irACatalogo }: { sedeId: string; catalogo
             </button>
           ))}
         </div>
+        {masSocios}
       </div>
       <div className="coach__ficha">
         {sel ? (
-          <FichaCoach key={sel} sedeId={sedeId} perfilId={sel} catalogo={catalogo} irACatalogo={irACatalogo} onCambio={() => setVersion((v) => v + 1)} />
+          <FichaCoach key={sel} sedeId={sedeId} perfilId={sel} catalogo={catalogo} irACatalogo={irACatalogo} onCatalogo={onCatalogo} onCambio={() => setVersion((v) => v + 1)} />
         ) : (
           <div className="card glass panel-msg">
             <h2 className="h3">Elige un socio</h2>
@@ -150,7 +152,7 @@ function SociosTab({ sedeId, catalogo, irACatalogo }: { sedeId: string; catalogo
   )
 }
 
-function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCambio }: { sedeId: string; perfilId: string; catalogo: Ejercicio[]; irACatalogo: () => void; onCambio: () => void }) {
+function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCatalogo, onCambio }: { sedeId: string; perfilId: string; catalogo: Ejercicio[]; irACatalogo: () => void; onCatalogo: () => void; onCambio: () => void }) {
   const id = useId()
   const [f, setF] = useState<FichaEntrenamiento | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -161,6 +163,21 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCambio }: { sed
   const accSalud = useAccion()
   const accPeso = useAccion()
   const accRutina = useAccion()
+  // Propuesta del sistema: el editor se reinicia con ella cada vez que se genera.
+  const [propuesta, setPropuesta] = useState<{ rutina: RutinaInput; razones: string[]; n: number } | null>(null)
+  const generar = (dias?: number) =>
+    accRutina.run(async () => {
+      const g = await api.generarRutina(sedeId, perfilId, dias)
+      setPropuesta({ rutina: g.rutina, razones: g.razones, n: Date.now() })
+      setEditando(true)
+      return 'Rutina generada. Revísala, cámbiala si hace falta y acéptala.'
+    })
+  // Ejercicio escrito a mano por el coach: se agrega al catálogo de la sede.
+  const crearEjercicio = async (nombre: string, base: Ejercicio | undefined) => {
+    const e = await api.crearEjercicio(sedeId, { nombre, categoria: base?.categoria ?? 'cuerpo_completo', equipo: 'otro', maquinaId: null, series: base?.series ?? 3, repeticiones: base?.repeticiones ?? '10-12', indicaciones: null })
+    onCatalogo()
+    return e
+  }
 
   const cargar = useCallback(
     () =>
@@ -275,7 +292,8 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCambio }: { sed
           <h3 className="h3">Rutina</h3>
           {f.rutina && !editando && (
             <div className="fila__acc">
-              <button type="button" className="btn btn--glass btn--sm glass" onClick={() => setEditando(true)}>Editar rutina</button>
+              <button type="button" className="btn btn--red btn--sm" disabled={accRutina.busy} onClick={() => generar()}>Generar nueva</button>
+              <button type="button" className="btn btn--glass btn--sm glass" onClick={() => { setPropuesta(null); setEditando(true) }}>Editar rutina</button>
               <button
                 type="button"
                 className="btn btn--glass btn--sm glass"
@@ -298,27 +316,38 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCambio }: { sed
         {accRutina.avisos}
         {editando ? (
           <RutinaEditor
+            key={propuesta?.n ?? 'actual'}
             catalogo={catalogo}
-            inicial={f.rutina}
+            inicial={propuesta?.rutina ?? f.rutina}
+            razones={propuesta?.razones ?? []}
             busy={accRutina.busy}
             irACatalogo={irACatalogo}
-            onCancelar={() => setEditando(false)}
+            onGenerar={generar}
+            onCrearEjercicio={crearEjercicio}
+            onCancelar={() => { setEditando(false); setPropuesta(null) }}
             onGuardar={(data) =>
               accRutina.run(async () => {
                 await api.guardarRutina(sedeId, perfilId, data)
                 await cargar()
                 setEditando(false)
+                setPropuesta(null)
                 onCambio()
-                return 'Rutina guardada. El socio ya la ve en su app.'
+                confirmarExito('Rutina enviada', `${f.nombre ?? 'El socio'} ya la ve en su app.`, 'Sigue vigente hasta que la cambies.')
               })
             }
           />
         ) : f.rutina ? (
-          <RutinaVista rutina={f.rutina} />
+          <>
+            <p className="field__hint">Vigente desde el {new Date(f.rutina.actualizada).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })} ({semanasDesde(f.rutina.actualizada)}). Cámbiala cuando lo consideres.</p>
+            <RutinaVista rutina={f.rutina} />
+          </>
         ) : (
           <div className="panel-msg">
-            <p>Todavía no tiene rutina.</p>
-            <button type="button" className="btn btn--red" onClick={() => setEditando(true)}>Crear rutina</button>
+            <p>Todavía no tiene rutina. El sistema la arma con su objetivo, nivel, edad y salud; tú la revisas y la aceptas.</p>
+            <div className="fila__acc">
+              <button type="button" className="btn btn--red" disabled={accRutina.busy} onClick={() => generar()}>{accRutina.busy ? 'Generando…' : 'Generar rutina'}</button>
+              <button type="button" className="btn btn--glass glass" onClick={() => setEditando(true)}>Armarla a mano</button>
+            </div>
           </div>
         )}
       </div>
@@ -327,6 +356,44 @@ function FichaCoach({ sedeId, perfilId, catalogo, irACatalogo, onCambio }: { sed
 }
 
 /* ---------- Editor de rutina ---------- */
+
+const semanasDesde = (iso: string) => {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  return d < 7 ? 'esta semana' : `hace ${Math.floor(d / 7)} semana${d >= 14 ? 's' : ''}`
+}
+
+/** Cambiar un ejercicio: elegir del catálogo o escribir uno nuevo (se agrega al catálogo). */
+function CambiarEjercicio({ actual, activos, onElegir, onCrear }: { actual: Ejercicio | undefined; activos: Ejercicio[]; onElegir: (e: Ejercicio) => void; onCrear: (nombre: string) => Promise<void> }) {
+  const lista = useId()
+  const [texto, setTexto] = useState('')
+  const [busy, setBusy] = useState(false)
+  const opciones = useMemo(() => [...activos].sort((a, b) => Number(b.categoria === actual?.categoria) - Number(a.categoria === actual?.categoria)), [activos, actual])
+  const aplicar = async () => {
+    const t = texto.trim()
+    if (t.length < 2) return
+    const existe = activos.find((e) => e.nombre.toLowerCase() === t.toLowerCase())
+    setBusy(true)
+    try {
+      if (existe) onElegir(existe)
+      else await onCrear(t)
+      setTexto('')
+    } catch (e) {
+      avisar('error', msg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="editor__cambiar">
+      <label className="field">
+        <span className="field__label">Cambiar por</span>
+        <input list={lista} placeholder="Escribe o elige otro ejercicio" value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void aplicar() } }} />
+        <datalist id={lista}>{opciones.map((e) => <option key={e.id} value={e.nombre}>{grupo(e.categoria)}</option>)}</datalist>
+      </label>
+      <button type="button" className="btn btn--glass btn--sm glass" disabled={busy || texto.trim().length < 2} onClick={() => void aplicar()}>{busy ? '…' : 'Cambiar'}</button>
+    </div>
+  )
+}
 
 interface ItemEditor {
   key: string
@@ -348,18 +415,25 @@ const nuevaLlave = () => `i${++llave}`
 function RutinaEditor({
   catalogo,
   inicial,
+  razones,
   busy,
   onGuardar,
+  onGenerar,
+  onCrearEjercicio,
   onCancelar,
   irACatalogo,
 }: {
   catalogo: Ejercicio[]
-  inicial: Rutina | null
+  inicial: Rutina | RutinaInput | null
+  razones: string[]
   busy: boolean
   onGuardar: (r: RutinaInput) => void
+  onGenerar: (dias?: number) => void
+  onCrearEjercicio: (nombre: string, base: Ejercicio | undefined) => Promise<Ejercicio>
   onCancelar: () => void
   irACatalogo: () => void
 }) {
+  const [diasGen, setDiasGen] = useState('')
   const id = useId()
   const [nombre, setNombre] = useState(inicial?.nombre ?? '')
   const [notas, setNotas] = useState(inicial?.notas ?? '')
@@ -385,7 +459,9 @@ function RutinaEditor({
   )
   const [error, setError] = useState<string | null>(null)
   const activos = useMemo(() => catalogo.filter((e) => e.activo), [catalogo])
-  const porId = useMemo(() => new Map(catalogo.map((e) => [e.id, e])), [catalogo])
+  // Ejercicios recién escritos, mientras llega el catálogo actualizado.
+  const [nuevos, setNuevos] = useState<Ejercicio[]>([])
+  const porId = useMemo(() => new Map([...nuevos, ...catalogo].map((e) => [e.id, e])), [catalogo, nuevos])
 
   const cambiarDia = (d: number, fn: (x: DiaEditor) => DiaEditor) =>
     setDias((m) => {
@@ -437,6 +513,22 @@ function RutinaEditor({
 
   return (
     <div className="form editor">
+      <div className="editor__generar">
+        <label className="field">
+          <span className="field__label">Días por semana</span>
+          <select className="select" value={diasGen} onChange={(e) => setDiasGen(e.target.value)}>
+            <option value="">Según sus visitas</option>
+            {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} días</option>)}
+          </select>
+        </label>
+        <button type="button" className="btn btn--red" disabled={busy} onClick={() => onGenerar(diasGen ? Number(diasGen) : undefined)}>{busy ? 'Generando…' : 'Generar rutina'}</button>
+      </div>
+      {razones.length > 0 && (
+        <div className="editor__razones">
+          <strong>Propuesta del sistema: revísala antes de aceptar</strong>
+          <ul>{razones.map((r) => <li key={r}>{r}</li>)}</ul>
+        </div>
+      )}
       <div className="form-row">
         <div className="field">
           <label htmlFor={`${id}-n`}>Nombre de la rutina</label>
@@ -506,6 +598,16 @@ function RutinaEditor({
                         <button type="button" className="btn btn--glass btn--sm glass" onClick={() => cambiarDia(d, (x) => ({ ...x, ejercicios: x.ejercicios.filter((y) => y.key !== e.key) }))}>Quitar</button>
                       </div>
                     </div>
+                    <CambiarEjercicio
+                      actual={ej}
+                      activos={activos}
+                      onElegir={(n) => cambiarDia(d, (x) => ({ ...x, ejercicios: x.ejercicios.map((y) => (y.key === e.key ? { ...y, ejercicioId: n.id } : y)) }))}
+                      onCrear={async (nombre) => {
+                        const n = await onCrearEjercicio(nombre, ej)
+                        setNuevos((l) => [...l, n])
+                        cambiarDia(d, (x) => ({ ...x, ejercicios: x.ejercicios.map((y) => (y.key === e.key ? { ...y, ejercicioId: n.id } : y)) }))
+                      }}
+                    />
                     <div className="editor__dosis">
                       <label className="field">
                         <span className="field__label">Series</span>
@@ -564,7 +666,7 @@ function RutinaEditor({
 
       {error && <p className="auth__error" role="alert">{error}</p>}
       <div className="fila__acc" style={{ justifyContent: 'flex-start' }}>
-        <button type="button" className="btn btn--red" disabled={busy} onClick={guardar}>{busy ? 'Guardando…' : 'Guardar rutina'}</button>
+        <button type="button" className="btn btn--red" disabled={busy} onClick={guardar}>{busy ? 'Guardando…' : 'Aceptar y enviar al socio'}</button>
         <button type="button" className="btn btn--glass glass" onClick={onCancelar}>Cancelar</button>
       </div>
     </div>
@@ -584,7 +686,11 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
   const accMaq = useAccion()
   const accEj = useAccion()
   const maquinasActivas = catalogo.maquinas.filter((m) => m.activa)
-  const lista = catalogo.ejercicios.filter((e) => !filtro || e.categoria === filtro)
+  const [qe, setQe] = useState('')
+  const [qm, setQm] = useState('')
+  const lista = catalogo.ejercicios.filter((e) => (!filtro || e.categoria === filtro) && (!qe || e.nombre.toLowerCase().includes(qe.toLowerCase())))
+  const [verEj, masEj] = useVerMas(lista, 10, `${filtro}|${qe}`)
+  const [verMaq, masMaq] = useVerMas(catalogo.maquinas.filter((m) => !qm || m.nombre.toLowerCase().includes(qm.toLowerCase())), 8, qm)
 
   return (
     <div className="grid-2">
@@ -615,9 +721,10 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
           <button className="btn btn--glass glass" disabled={accMaq.busy} style={{ alignSelf: 'end' }}>Agregar</button>
         </form>
         {accMaq.avisos}
+        {catalogo.maquinas.length > 6 && <input type="search" aria-label="Buscar máquina" placeholder="Buscar máquina…" value={qm} onChange={(e) => setQm(e.target.value)} />}
         <div className="lista">
           {catalogo.maquinas.length === 0 && <p className="field__hint">Agrega las máquinas que hay en esta sede.</p>}
-          {catalogo.maquinas.map((m) => (
+          {verMaq.map((m) => (
             <div key={m.id} className={`fila ${m.activa ? '' : 'fila--off'}`}>
               <div className="fila__main">
                 <strong>{m.nombre}</strong>
@@ -629,6 +736,7 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
             </div>
           ))}
         </div>
+        {masMaq}
       </div>
 
       <div className="card glass form">
@@ -713,9 +821,10 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
             {GRUPOS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </label>
+        <input type="search" aria-label="Buscar ejercicio" placeholder="Buscar ejercicio…" value={qe} onChange={(e) => setQe(e.target.value)} />
         <div className="lista">
-          {lista.length === 0 && <p className="field__hint">{catalogo.ejercicios.length ? 'Ningún ejercicio de ese grupo.' : 'Agrega los ejercicios con los que armarás las rutinas.'}</p>}
-          {lista.map((e) => (
+          {lista.length === 0 && <p className="field__hint">{catalogo.ejercicios.length ? 'Ningún ejercicio con ese filtro.' : 'Agrega los ejercicios con los que armarás las rutinas.'}</p>}
+          {verEj.map((e) => (
             <div key={e.id} className={`fila ${e.activo ? '' : 'fila--off'}`}>
               <div className="fila__main">
                 <strong>{e.nombre}</strong>
@@ -739,6 +848,7 @@ function CatalogoTab({ sedeId, catalogo, onCambio }: { sedeId: string; catalogo:
             </div>
           ))}
         </div>
+        {masEj}
       </div>
     </div>
   )

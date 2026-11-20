@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, actualizarPerfil, subirFoto, type Yo } from '../auth/api'
 import { AvancePeso, DIAS_LARGO, OBJETIVOS, RachaVista, RutinaVista, SEMANA, equipo, grupo, hoyDia, objetivo } from './Entrenamiento'
 import { Icono } from './Icono'
-import { IconoNav, Pestanas, avisar, confirmarExito, type IconoUI } from './Navegacion'
+import { IconoNav, Pestanas, avisar, confirmarExito, type IconoUI, useVerMas, destacadosPrimero } from './Navegacion'
 import { PanelLayout, tiene } from './PanelLayout'
 import { api, fechaLarga, horaMx, pesos, type Catalogo, type FichaEntrenamiento, type MiMembresia, type Nutricion, type Objetivo, type Plan, type Sexo } from './api'
 
@@ -441,6 +441,7 @@ function PlanModal({ plan, yo, m, pendiente, onCerrar, onCambio }: { plan: Plan;
 /* ---------------- Tienda ---------------- */
 
 function Tienda({ catalogo }: { catalogo: Catalogo | null }) {
+  const [verProds, masProds] = useVerMas(destacadosPrimero(catalogo?.productos ?? []), 8)
   if (!catalogo) return <div className="card glass panel-msg"><span className="auth__spinner" aria-hidden="true" /> Cargando…</div>
   if (!catalogo.promociones.length && !catalogo.productos.length) {
     return <div className="card glass panel-msg"><p>Tu sede todavía no publica productos ni promociones.</p></div>
@@ -464,7 +465,7 @@ function Tienda({ catalogo }: { catalogo: Catalogo | null }) {
         </div>
       )}
       <div className="productos-grid">
-        {catalogo.productos.map((p) => (
+        {verProds.map((p) => (
           <div key={p.id} className="prod" style={{ cursor: 'default' }} aria-disabled={!p.disponible}>
             <span className="prod__icono"><Icono nombre={p.icono} /></span>
             <strong>{p.nombre}</strong>
@@ -473,6 +474,7 @@ function Tienda({ catalogo }: { catalogo: Catalogo | null }) {
           </div>
         ))}
       </div>
+      {masProds}
     </div>
   )
 }
