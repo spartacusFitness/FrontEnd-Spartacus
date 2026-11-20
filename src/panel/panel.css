@@ -760,3 +760,7 @@ button.fila:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; 
   /* deja ver la última fila debajo del botón flotante de crear */
   body:has(.crear--flotante) .panel--con-barra { padding-bottom: 184px; }
 }
+
+/* Hoy toca: solo los músculos del día */
+.hoy-grupos { margin: 0; font-weight: 900; font-size: clamp(1.4rem, 4.5vw, 2rem); line-height: 1.1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--white); overflow-wrap: anywhere; }
+.hoy-toca small + small { display: block; }

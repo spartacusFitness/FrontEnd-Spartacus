@@ -155,6 +155,7 @@ function Bloqueado({ titulo, incluye, ir, compacto = false }: { titulo: string; 
 /* ---------------- Inicio ---------------- */
 
 function Inicio({ m, ficha, nutri, promosHoy, ir, bloqueada }: { m: MiMembresia | null; ficha: FichaEntrenamiento | null; nutri: Nutricion | null; promosHoy: number; ir: (t: Tab) => void; bloqueada: boolean }) {
+  const [verHoy, setVerHoy] = useState(false)
   const hoy = hoyDia()
   const rutina = ficha?.rutina
   const deHoy = rutina?.dias.find((d) => d.diaSemana === hoy)
@@ -197,18 +198,32 @@ function Inicio({ m, ficha, nutri, promosHoy, ir, bloqueada }: { m: MiMembresia 
           )}
           {deHoy && (
             <>
-              <p className="hoy-toca__grupos">{deHoy.categorias.map(grupo).join(' · ') || rutina!.nombre}</p>
-              <ol className="hoy-toca">
-                {deHoy.ejercicios.map((e, i) => (
-                  <li key={i}>
-                    <span>{e.nombre}<small>{e.maquina ?? equipo(e.equipo)}</small></span>
-                    <strong>{e.series} × {e.repeticiones}</strong>
-                  </li>
-                ))}
-              </ol>
+              {/* En inicio solo los músculos del día; la rutina completa se abre con "Ver". */}
+              <p className="hoy-grupos">{deHoy.categorias.map(grupo).join(' · ') || rutina!.nombre}</p>
+              <p className="field__hint">{deHoy.ejercicios.length} {deHoy.ejercicios.length === 1 ? 'ejercicio' : 'ejercicios'}</p>
+              <button type="button" className="btn btn--red" onClick={() => setVerHoy(true)}>Ver rutina de hoy</button>
+              {verHoy && (
+                <ModalEdicion titulo={`Hoy · ${DIAS_LARGO[deHoy.diaSemana]}`} onCerrar={() => setVerHoy(false)}>
+                  <p className="hoy-toca__grupos">{deHoy.categorias.map(grupo).join(' · ') || rutina!.nombre}</p>
+                  {deHoy.notas && <p className="field__hint">{deHoy.notas}</p>}
+                  <ol className="hoy-toca">
+                    {deHoy.ejercicios.map((e, i) => (
+                      <li key={i}>
+                        <span>
+                          {e.nombre}
+                          <small>{e.maquina ?? equipo(e.equipo)}{e.descansoSeg ? ` · descanso ${e.descansoSeg} s` : ''}</small>
+                          {e.indicaciones && <small>{e.indicaciones}</small>}
+                        </span>
+                        <strong>{e.series} × {e.repeticiones}</strong>
+                      </li>
+                    ))}
+                  </ol>
+                  <button type="button" className="btn btn--glass glass" onClick={() => { setVerHoy(false); ir('rutina') }}>Ver la semana completa</button>
+                </ModalEdicion>
+              )}
             </>
           )}
-          {rutina && <button type="button" className="btn btn--glass glass" onClick={() => ir('rutina')}>Ver rutina de la semana</button>}
+          {rutina && !deHoy && <button type="button" className="btn btn--glass glass" onClick={() => ir('rutina')}>Ver rutina de la semana</button>}
         </div>
       </div>
 
